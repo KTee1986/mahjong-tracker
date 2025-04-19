@@ -12,25 +12,30 @@ export default function Stats() {
         data.slice(1).forEach(row => {
           const seats = ["East", "South", "West", "North"];
           seats.forEach((seat, i) => {
-            const player = row[2 + i * 2];
+            const playerCell = row[2 + i * 2];
             const score = Number(row[3 + i * 2] || 0);
-            if (!player) return;
-            if (!stats[player]) {
-              stats[player] = {
-                player,
-                totalGames: 0,
-                totalScore: 0,
-                positiveGames: 0,
-                highest: -Infinity,
-                lowest: Infinity,
-              };
-            }
-            const s = stats[player];
-            s.totalGames += 1;
-            s.totalScore += score;
-            if (score > 0) s.positiveGames += 1;
-            s.highest = Math.max(s.highest, score);
-            s.lowest = Math.min(s.lowest, score);
+            if (!playerCell) return;
+            const playerNames = playerCell.split("+").map(name => name.trim()).filter(Boolean);
+            const splitScore = score / playerNames.length;
+
+            playerNames.forEach(player => {
+              if (!stats[player]) {
+                stats[player] = {
+                  player,
+                  totalGames: 0,
+                  totalScore: 0,
+                  positiveGames: 0,
+                  highest: -Infinity,
+                  lowest: Infinity,
+                };
+              }
+              const s = stats[player];
+              s.totalGames += 1;
+              s.totalScore += splitScore;
+              if (splitScore > 0) s.positiveGames += 1;
+              s.highest = Math.max(s.highest, splitScore);
+              s.lowest = Math.min(s.lowest, splitScore);
+            });
           });
         });
 
@@ -39,8 +44,8 @@ export default function Stats() {
           games: s.totalGames,
           winRate: ((s.positiveGames / s.totalGames) * 100).toFixed(1) + '%',
           average: (s.totalScore / s.totalGames).toFixed(2),
-          highest: s.highest,
-          lowest: s.lowest
+          highest: s.highest.toFixed(2),
+          lowest: s.lowest.toFixed(2),
         }));
 
         setRows(table);

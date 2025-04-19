@@ -11,14 +11,36 @@ export default function Chart() {
     fetch("/api/sheet")
       .then(res => res.json())
       .then(({ data }) => {
-        const entries = data.slice(1).map(row => ({
-          timestamp: row[1],
-          East: Number(row[3] || 0),
-          South: Number(row[5] || 0),
-          West: Number(row[7] || 0),
-          North: Number(row[9] || 0),
-        }));
-        setData(entries);
+        const playerScores = {};
+        data.slice(1).forEach((row, index) => {
+          const timestamp = row[1];
+          const seats = ["East", "South", "West", "North"];
+
+          seats.forEach((seat, i) => {
+            const nameCell = row[2 + i * 2];
+            const score = Number(row[3 + i * 2] || 0);
+            if (!nameCell) return;
+            const players = nameCell.split("+").map((n) => n.trim()).filter(Boolean);
+            const share = score / players.length;
+
+            players.forEach((p) => {
+              if (!playerScores[p]) playerScores[p] = [];
+              const last = playerScores[p].length ? playerScores[p][playerScores[p].length - 1].score : 0;
+              playerScores[p].push({ timestamp, score: last + share });
+            });
+          });
+        });
+
+        const timestamps = data.slice(1).map((r) => r[1]);
+        const graph = timestamps.map((t, i) => {
+          const entry = { timestamp: t };
+          for (const p in playerScores) {
+            entry[p] = playerScores[p][i]?.score ?? null;
+          }
+          return entry;
+        });
+
+        setData(graph);
       });
   }, []);
 
@@ -33,10 +55,18 @@ export default function Chart() {
             <YAxis />
             <Tooltip />
             <Legend />
-            <Line type="monotone" dataKey="East" stroke="#8884d8" />
-            <Line type="monotone" dataKey="South" stroke="#82ca9d" />
-            <Line type="monotone" dataKey="West" stroke="#ffc658" />
-            <Line type="monotone" dataKey="North" stroke="#ff7300" />
+            {data.length > 0 &&
+              Object.keys(data[0])
+                .filter((k) => k !== "timestamp")
+                .map((player) => (
+                  <Line
+                    key={player}
+                    type="monotone"
+                    dataKey={player}
+                    stroke="#8884d8"
+                    dot={false}
+                  />
+                ))}
           </LineChart>
         </ResponsiveContainer>
       </div>

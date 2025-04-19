@@ -1,0 +1,1 @@
+Mahjong Score Tracker - All sections fully wired with 2-player-per-seat logic.
