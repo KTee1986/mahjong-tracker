@@ -44,7 +44,6 @@ export default function Layout({ children }) {
             </Link>
           ))}
         </div>
-
         {isAdmin && (
           <button
             onClick={handleLogout}
@@ -54,7 +53,6 @@ export default function Layout({ children }) {
           </button>
         )}
       </nav>
-
       <main className="flex-1 p-4">{children}</main>
     </div>
   );
