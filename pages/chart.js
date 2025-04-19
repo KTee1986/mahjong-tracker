@@ -5,6 +5,12 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from "recharts";
 
+const COLORS = [
+  "#FF6633", "#FF33FF", "#00B3E6", "#3366E6",
+  "#999966", "#B34D4D", "#80B300", "#809900",
+  "#E6B3B3", "#6680B3", "#66991A", "#FF99E6"
+];
+
 export default function Chart() {
   const [data, setData] = useState([]);
   const [playerList, setPlayerList] = useState([]);
@@ -48,7 +54,7 @@ export default function Chart() {
 
         setData(graph);
         setPlayerList(Object.keys(playerScores));
-        setSelectedPlayers(Object.keys(playerScores)); // Default to all
+        setSelectedPlayers([]); // default to none
       });
   }, []);
 
@@ -91,16 +97,15 @@ export default function Chart() {
             <YAxis />
             <Tooltip />
             <Legend />
-            {data.length > 0 &&
-              selectedPlayers.map((player) => (
-                <Line
-                  key={player}
-                  type="monotone"
-                  dataKey={player}
-                  stroke="#8884d8"
-                  dot={false}
-                />
-              ))}
+            {selectedPlayers.map((player, index) => (
+              <Line
+                key={player}
+                type="monotone"
+                dataKey={player}
+                stroke={COLORS[index % COLORS.length]}
+                dot={false}
+              />
+            ))}
           </LineChart>
         </ResponsiveContainer>
       </div>
