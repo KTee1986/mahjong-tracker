@@ -19,7 +19,7 @@ export default function ScoreEntry() {
     const admin = sessionStorage.getItem("admin");
     if (admin !== "true") router.replace("/login");
     else setIsAdmin(true);
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     fetch("/api/sheet")
@@ -67,6 +67,71 @@ export default function ScoreEntry() {
       return;
     }
 
-    const res = await fetch("/api/sheet", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    try {
+      const res = await fetch("/api/sheet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ players, scores }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setMessage(`Game recorded! ID: ${data.gameId}`);
+        setPlayers({ East: "", South: "", West: "", North: "" });
+        setScores({ East: "", South: "", West: "", North: "" });
+      } else {
+        setError(data.error || "Error submitting game.");
+      }
+    } catch (err) {
+      setError("Failed to submit. Check console for details.");
+      console.error(err);
+    }
+  };
+
+  if (isAdmin === null) return null;
+
+  return (
+    <Layout>
+      <h1 className="text-xl font-bold mb-4">Score Entry</h1>
+
+      {seats.map((seat) => (
+        <div key={seat} className="mb-4">
+          <label className="block font-semibold">{seat} Player</label>
+          <input
+            type="text"
+            value={players[seat]}
+            onChange={(e) => handleInput(seat, "player", e.target.value)}
+            className="w-full p-2 rounded bg-gray-800 text-white mt-1"
+            placeholder="e.g., Alice"
+            list={`autocomplete-${seat}`}
+          />
+          <datalist id={`autocomplete-${seat}`}>
+            {suggestions.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+
+          <label className="block font-semibold mt-2">{seat} Score</label>
+          <input
+            type="number"
+            value={scores[seat]}
+            onChange={(e) => handleInput(seat, "score", e.target.value)}
+            className="w-full p-2 rounded bg-gray-800 text-white mt-1"
+            placeholder="e.g., -5"
+          />
+        </div>
+      ))}
+
+      <p className="text-sm text-gray-400 mb-2">Total: {calculateTotal()}</p>
+      {error && <p className="text-red-400">{error}</p>}
+      {message && <p className="text-green-400">{message}</p>}
+
+      <button
+        onClick={handleSubmit}
+        className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white mt-4"
+      >
+        Submit Game
+      </button>
+    </Layout>
+  );
+}
