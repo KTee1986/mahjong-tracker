@@ -7,77 +7,81 @@ export default function PlayerInsights() {
   const [players, setPlayers] = useState([]);
   const [selected, setSelected] = useState("");
   const [insight, setInsight] = useState({});
-  const [pairStats, setPairStats] = useState({});
+  const [pairStats, setPairStats] = useState({
+    bestTeammate: {},
+    worstTeammate: {},
+    mostWins: {},
+    mostLosses: {},
+    mostPairedWith: {},
+    leastPairedWith: {}
+  });
 
   useEffect(() => {
     fetch("/api/sheet")
       .then((res) => res.json())
       .then(({ data }) => {
         const allPlayers = [];
-        const pairs = {};
+        const pairStats = {
+          bestTeammate: {},
+          worstTeammate: {},
+          mostWins: {},
+          mostLosses: {},
+          mostPairedWith: {},
+          leastPairedWith: {}
+        };
 
         data.slice(1).forEach((row) => {
-          ["East", "South", "West", "North"].forEach((seat, i) => {
+          const seats = ["East", "South", "West", "North"];
+          seats.forEach((seat, i) => {
             const names = (row[2 + i * 2] || "").split("+").map(n => n.trim()).filter(Boolean);
-            allPlayers.push(...names);
+            const score = Number(row[3 + i * 2]);
 
-            // Track pairings and wins/losses
             if (names.length === 2) {
               const [p1, p2] = names;
-              const score = Number(row[3 + i * 2]);
-              if (!pairs[p1]) pairs[p1] = {};
-              if (!pairs[p2]) pairs[p2] = {};
-
-              pairs[p1][p2] = (pairs[p1][p2] || 0) + score;
-              pairs[p2][p1] = (pairs[p2][p1] || 0) + score;
+              if (!pairStats.mostPairedWith[p1]) pairStats.mostPairedWith[p1] = 0;
+              if (!pairStats.mostPairedWith[p2]) pairStats.mostPairedWith[p2] = 0;
+              pairStats.mostPairedWith[p1]++;
+              pairStats.mostPairedWith[p2]++;
             }
+
+            if (!allPlayers.includes(names[0])) allPlayers.push(names[0]);
+            if (names.length > 1 && !allPlayers.includes(names[1])) allPlayers.push(names[1]);
+
+            names.forEach((player) => {
+              if (!pairStats.mostWins[player]) pairStats.mostWins[player] = 0;
+              if (!pairStats.mostLosses[player]) pairStats.mostLosses[player] = 0;
+              if (!pairStats.bestTeammate[player]) pairStats.bestTeammate[player] = { score: 0, games: 0 };
+              if (!pairStats.worstTeammate[player]) pairStats.worstTeammate[player] = { score: 0, games: 0 };
+
+              if (score > 0) {
+                pairStats.mostWins[player]++;
+                pairStats.bestTeammate[player].score += score;
+                pairStats.bestTeammate[player].games++;
+              } else {
+                pairStats.mostLosses[player]++;
+                pairStats.worstTeammate[player].score += score;
+                pairStats.worstTeammate[player].games++;
+              }
+            });
           });
         });
 
-        const unique = [...new Set(allPlayers)].sort();
-        setPlayers(unique);
+        const bestTeammate = Object.entries(pairStats.bestTeammate).map(([player, stats]) => {
+          const avgScore = stats.score / stats.games;
+          return { player, avgScore };
+        }).sort((a, b) => b.avgScore - a.avgScore)[0];
+
+        const worstTeammate = Object.entries(pairStats.worstTeammate).map(([player, stats]) => {
+          const avgScore = stats.score / stats.games;
+          return { player, avgScore };
+        }).sort((a, b) => a.avgScore - b.avgScore)[0];
+
+        setPairStats(pairStats);
+        setInsight({ bestTeammate, worstTeammate });
+        setPlayers(allPlayers);
         setData(data.slice(1));
-        setPairStats(pairs);
       });
   }, []);
-
-  useEffect(() => {
-    if (!selected || !data.length) return;
-    const opponents = {};
-
-    data.forEach((row) => {
-      const seatData = [
-        [row[2], Number(row[3])], // East
-        [row[4], Number(row[5])],
-        [row[6], Number(row[7])],
-        [row[8], Number(row[9])]
-      ];
-
-      const involved = seatData.find(([p]) => p?.includes(selected));
-      if (!involved) return;
-
-      const [playerStr, playerScore] = involved;
-      const selfSplit = playerStr.split("+").map(s => s.trim());
-      const selfShare = playerScore / selfSplit.length;
-
-      seatData.forEach(([oppStr, oppScore]) => {
-        if (!oppStr || oppStr.includes(selected)) return;
-        const oppSplit = oppStr.split("+").map(s => s.trim());
-        const oppShare = oppScore / oppSplit.length;
-
-        oppSplit.forEach((opp) => {
-          if (!opponents[opp]) opponents[opp] = 0;
-          opponents[opp] -= selfShare;
-        });
-      });
-    });
-
-    const sorted = Object.entries(opponents).sort((a, b) => b[1] - a[1]);
-    setInsight({
-      best: sorted[0],
-      worst: sorted[sorted.length - 1],
-    });
-  }, [selected, data]);
 
   return (
     <Layout>
@@ -94,10 +98,10 @@ export default function PlayerInsights() {
         ))}
       </select>
 
-      {selected && insight.best && (
+      {selected && insight.bestTeammate && (
         <div className="text-sm space-y-2">
-          <p><strong>Best vs:</strong> {insight.best[0]} (+{insight.best[1].toFixed(2)})</p>
-          <p><strong>Worst vs:</strong> {insight.worst[0]} ({insight.worst[1].toFixed(2)})</p>
+          <p><strong>Best player to play with:</strong> {insight.bestTeammate.player} with an average score of {insight.bestTeammate.avgScore.toFixed(2)}</p>
+          <p><strong>Worst player to play with:</strong> {insight.worstTeammate.player} with an average score of {insight.worstTeammate.avgScore.toFixed(2)}</p>
         </div>
       )}
     </Layout>

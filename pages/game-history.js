@@ -38,7 +38,6 @@ export default function GameHistory() {
   };
 
   const saveEdit = () => {
-    // logic for saving to Google Sheets would go here (requires /api/edit endpoint)
     const updated = [...data];
     updated[editIndex] = [
       form.id, form.timestamp,
@@ -53,7 +52,6 @@ export default function GameHistory() {
 
   const deleteRow = (i) => {
     if (window.confirm('Are you sure you want to delete this record?')) {
-      // logic for delete would call /api/delete endpoint with game ID
       const updated = data.filter((_, idx) => idx !== i);
       setData(updated);
     }
