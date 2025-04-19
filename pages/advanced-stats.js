@@ -86,23 +86,23 @@ export default function AdvancedStats() {
       <div className="space-y-4">
         <div>
           <h2 className="font-semibold">Most Volatile Player</h2>
-          <p>{stats.mostVolatile.player} with a volatility score of {stats.mostVolatile.variance?.toFixed(2)}</p>
+          <p>{stats.mostVolatile.player ? `${stats.mostVolatile.player} with a volatility score of ${stats.mostVolatile.variance?.toFixed(2)}` : "Loading..."}</p>
         </div>
         <div>
           <h2 className="font-semibold">Most Played Player</h2>
-          <p>{stats.mostPlayed}</p>
+          <p>{stats.mostPlayed || "Loading..."}</p>
         </div>
         <div>
           <h2 className="font-semibold">Least Played Player</h2>
-          <p>{stats.leastPlayed}</p>
+          <p>{stats.leastPlayed || "Loading..."}</p>
         </div>
         <div>
           <h2 className="font-semibold">Biggest Win</h2>
-          <p>{stats.biggestWin?.player} with {stats.biggestWin?.highestWin?.score} on {stats.biggestWin?.highestWin?.timestamp}</p>
+          <p>{stats.biggestWin?.player ? `${stats.biggestWin?.player} with ${stats.biggestWin?.highestWin?.score} on ${stats.biggestWin?.highestWin?.timestamp}` : "Loading..."}</p>
         </div>
         <div>
           <h2 className="font-semibold">Biggest Loss</h2>
-          <p>{stats.biggestLoss?.player} with {stats.biggestLoss?.highestLoss?.score} on {stats.biggestLoss?.highestLoss?.timestamp}</p>
+          <p>{stats.biggestLoss?.player ? `${stats.biggestLoss?.player} with ${stats.biggestLoss?.highestLoss?.score} on ${stats.biggestLoss?.highestLoss?.timestamp}` : "Loading..."}</p>
         </div>
       </div>
     </Layout>
