@@ -21,13 +21,13 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center">
       <h1 className="text-2xl font-bold mb-6">Admin Login</h1>
       <input
         type="password"
+        placeholder="Enter admin password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        placeholder="Enter admin password"
         className="p-2 rounded bg-gray-800 text-white w-full max-w-xs"
       />
       {error && <p className="text-red-400 mt-2">{error}</p>}
