@@ -1,116 +1,97 @@
 
 import Layout from "../components/Layout";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function PlayerInsights() {
-  const [playerStats, setPlayerStats] = useState([]);
+  const [players, setPlayers] = useState([]);
   const [selectedPlayer, setSelectedPlayer] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-  const [players, setPlayers] = useState([]);
-  
+  const [insights, setInsights] = useState({});
+
   useEffect(() => {
-    fetch("/api/sheet")
+    // Fetch list of players for the dropdown
+    fetch("/api/players")
       .then((res) => res.json())
-      .then(({ data }) => {
-        const playersSet = new Set();
-        const stats = data.slice(1).reduce((acc, row) => {
-          const gameDate = new Date(row[1]);
-          if (
-            (fromDate && gameDate < new Date(fromDate)) ||
-            (toDate && gameDate > new Date(toDate))
-          ) {
-            return acc; // Skip records outside of the selected date range
-          }
-          // Collect players
-          playersSet.add(row[2]);
-          playersSet.add(row[3]);
-          playersSet.add(row[5]);
-          playersSet.add(row[6]);
-          playersSet.add(row[8]);
-          playersSet.add(row[9]);
-          playersSet.add(row[11]);
-          playersSet.add(row[12]);
-
-          // East Player Stats
-          acc[row[2]] = acc[row[2]] || { wins: 0, losses: 0, games: 0, monthlyWins: [], monthlyLosses: [], partners: {}, pairedWith: {}, winWith: {}, loseWith: {} };
-          acc[row[2]].games += 1;
-          if (parseFloat(row[4]) > 0) {
-            acc[row[2]].wins += 1;
-            const month = new Date(row[1]).toLocaleString("default", { month: "long", year: "numeric" });
-            acc[row[2]].monthlyWins.push(month);
-            acc[row[2]].winWith[row[3]] = (acc[row[2]].winWith[row[3]] || 0) + 1;
-            acc[row[2]].pairedWith[row[3]] = (acc[row[2]].pairedWith[row[3]] || 0) + 1;
-          } else {
-            acc[row[2]].losses += 1;
-            const month = new Date(row[1]).toLocaleString("default", { month: "long", year: "numeric" });
-            acc[row[2]].monthlyLosses.push(month);
-            acc[row[2]].loseWith[row[3]] = (acc[row[2]].loseWith[row[3]] || 0) + 1;
-            acc[row[2]].pairedWith[row[3]] = (acc[row[2]].pairedWith[row[3]] || 0) + 1;
-          }
-          // Repeat for other players as in the previous version
-
-          return acc;
-        }, {});
-        setPlayerStats(stats);
-        setPlayers(Array.from(playersSet));
+      .then((data) => {
+        setPlayers(data);
       });
-  }, [fromDate, toDate]);
+  }, []);
 
-  const getMostFrequentMonth = (months) => {
-    const monthCount = {};
-    months.forEach((month) => {
-      monthCount[month] = (monthCount[month] || 0) + 1;
-    });
-    return Object.entries(monthCount).reduce((max, entry) => entry[1] > max[1] ? entry : max, ["", 0])[0];
-  };
+  const handleFetchInsights = async () => {
+    let url = `/api/player-insights?player=${selectedPlayer}`;
+    if (fromDate) url += `&from=${fromDate}`;
+    if (toDate) url += `&to=${toDate}`;
 
-  const getBestOrWorstPlayer = (stats, win) => {
-    const partnerStats = win ? stats.winWith : stats.loseWith;
-    return Object.entries(partnerStats).reduce((max, entry) => entry[1] > max[1] ? entry : max, ["", 0])[0];
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+      setInsights(data);
+    } catch (error) {
+      console.error("Error fetching player insights:", error);
+    }
   };
 
   return (
     <Layout>
       <h1 className="text-xl font-bold mb-4">Player Insights</h1>
-      <div>
-        <label>Select Player:</label>
-        <select onChange={(e) => setSelectedPlayer(e.target.value)} value={selectedPlayer} className="text-black">
-          <option value="">Select a Player</option>
-          {players.map((player, i) => (
-            <option key={i} value={player}>{player}</option>
+      <div className="mb-4">
+        <label htmlFor="player-select">Select Player: </label>
+        <select
+          id="player-select"
+          value={selectedPlayer}
+          onChange={(e) => setSelectedPlayer(e.target.value)}
+          className="bg-gray-800 text-white border p-2 rounded"
+        >
+          <option value="">--Select Player--</option>
+          {players.map((player) => (
+            <option key={player} value={player}>
+              {player}
+            </option>
           ))}
         </select>
-        <div className="mt-2 mb-4">
-          <label>From Date:</label>
-          <input 
-            type="date" 
-            value={fromDate} 
-            onChange={(e) => setFromDate(e.target.value)} 
-            className="bg-gray-700 text-white p-2"
-          />
-          <label>To Date:</label>
-          <input 
-            type="date" 
-            value={toDate} 
-            onChange={(e) => setToDate(e.target.value)} 
-            className="bg-gray-700 text-white p-2"
-          />
-        </div>
-        {selectedPlayer && playerStats[selectedPlayer] && (
+      </div>
+      <div className="mb-4">
+        <label htmlFor="from-date">From Date: </label>
+        <input
+          type="date"
+          id="from-date"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+          className="bg-gray-800 text-white border p-2 rounded"
+        />
+      </div>
+      <div className="mb-4">
+        <label htmlFor="to-date">To Date: </label>
+        <input
+          type="date"
+          id="to-date"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
+          className="bg-gray-800 text-white border p-2 rounded"
+        />
+      </div>
+      <button
+        onClick={handleFetchInsights}
+        className="bg-blue-500 text-white p-2 rounded mt-4"
+      >
+        Get Insights
+      </button>
+      <div className="mt-6">
+        <h2 className="text-lg font-bold">Player Insights:</h2>
+        {insights ? (
           <div>
-            <h2>{selectedPlayer}</h2>
-            <p>Wins: {playerStats[selectedPlayer].wins}</p>
-            <p>Losses: {playerStats[selectedPlayer].losses}</p>
-            <p>Total Games Played: {playerStats[selectedPlayer].games}</p>
-            <p>Luckiest Month/Year: {getMostFrequentMonth(playerStats[selectedPlayer].monthlyWins)}</p>
-            <p>Blacklisted Month/Year: {getMostFrequentMonth(playerStats[selectedPlayer].monthlyLosses)}</p>
-            <p>Best Player to Partner With: {getBestOrWorstPlayer(playerStats[selectedPlayer], true)}</p>
-            <p>Worst Player to Partner With: {getBestOrWorstPlayer(playerStats[selectedPlayer], false)}</p>
-            <p>Most Frequently Paired With: {Object.entries(playerStats[selectedPlayer].pairedWith).reduce((max, entry) => entry[1] > max[1] ? entry : max, ["", 0])[0]}</p>
-            <p>Least Frequently Paired With: {Object.entries(playerStats[selectedPlayer].pairedWith).reduce((min, entry) => entry[1] < min[1] ? entry : min, ["", Infinity])[0]}</p>
-            {/* Add additional stats here as needed */}
+            <p><strong>Luckiest Month/Year:</strong> {insights.luckiestMonth}</p>
+            <p><strong>Blacklist Month/Year:</strong> {insights.blacklistMonth}</p>
+            <p><strong>Best Player to Partner With:</strong> {insights.bestPartner}</p>
+            <p><strong>Worst Player to Partner With:</strong> {insights.worstPartner}</p>
+            <p><strong>Win the Most with:</strong> {insights.winMostWith}</p>
+            <p><strong>Lose the Most with:</strong> {insights.loseMostWith}</p>
+            <p><strong>Most Frequently Paired With:</strong> {insights.mostFrequentlyPaired}</p>
+            <p><strong>Least Frequently Paired With:</strong> {insights.leastFrequentlyPaired}</p>
           </div>
+        ) : (
+          <p>No insights to display. Please select a player and a date range.</p>
         )}
       </div>
     </Layout>
