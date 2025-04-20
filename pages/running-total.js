@@ -31,29 +31,28 @@ export default function RunningTotal() {
 
   useEffect(() => {
     const totals = {};
+
+    // Loop through filtered data
     filteredData.forEach((row) => {
-      // Handle each row's score and pairings
       const players = [
-        { name: row[2], score: parseInt(row[4]) },
-        { name: row[3], score: parseInt(row[4]) },
-        { name: row[5], score: parseInt(row[7]) },
-        { name: row[6], score: parseInt(row[7]) },
-        { name: row[8], score: parseInt(row[10]) },
-        { name: row[9], score: parseInt(row[10]) },
-        { name: row[11], score: parseInt(row[13]) },
-        { name: row[12], score: parseInt(row[13]) },
+        { name: row[2], score: parseInt(row[4], 10) },  // East Player & East Score
+        { name: row[3], score: parseInt(row[4], 10) },  // West Player & West Score
+        { name: row[5], score: parseInt(row[7], 10) },  // South Player & South Score
+        { name: row[6], score: parseInt(row[7], 10) },  // North Player & North Score
+        { name: row[8], score: parseInt(row[10], 10) }, // Another set of pairs...
+        { name: row[9], score: parseInt(row[10], 10) }, // Another set of pairs...
+        { name: row[11], score: parseInt(row[13], 10) },
+        { name: row[12], score: parseInt(row[13], 10) },
       ];
 
-      // Split the score for pairs
+      // Handle paired players: if East is paired with West, split their score
       players.forEach((player, idx) => {
-        if (idx % 2 === 0) {  // If East/South are paired with West/North
-          const partnerIdx = idx + 1; // Partnering logic (East pairs with West, South with North)
-          if (player && players[partnerIdx]) {
-            player.score = player.score / 2; // Split the score between paired players
-            players[partnerIdx].score = players[partnerIdx].score / 2;
-          }
+        // Splitting score for paired players
+        if (idx % 2 === 0 && players[idx + 1]) {  // Pairing logic: East pairs with West, South with North
+          player.score = player.score / 2;
+          players[idx + 1].score = players[idx + 1].score / 2;
         }
-        
+
         if (totals[player.name]) {
           totals[player.name] += player.score;
         } else {
