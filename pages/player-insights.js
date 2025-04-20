@@ -7,11 +7,13 @@ export default function PlayerInsights() {
   const [selectedPlayer, setSelectedPlayer] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [players, setPlayers] = useState([]);
   
   useEffect(() => {
     fetch("/api/sheet")
       .then((res) => res.json())
       .then(({ data }) => {
+        const playersSet = new Set();
         const stats = data.slice(1).reduce((acc, row) => {
           const gameDate = new Date(row[1]);
           if (
@@ -20,6 +22,16 @@ export default function PlayerInsights() {
           ) {
             return acc; // Skip records outside of the selected date range
           }
+          // Collect players
+          playersSet.add(row[2]);
+          playersSet.add(row[3]);
+          playersSet.add(row[5]);
+          playersSet.add(row[6]);
+          playersSet.add(row[8]);
+          playersSet.add(row[9]);
+          playersSet.add(row[11]);
+          playersSet.add(row[12]);
+
           // East Player Stats
           acc[row[2]] = acc[row[2]] || { wins: 0, losses: 0, games: 0, monthlyWins: [], monthlyLosses: [], partners: {}, pairedWith: {}, winWith: {}, loseWith: {} };
           acc[row[2]].games += 1;
@@ -41,6 +53,7 @@ export default function PlayerInsights() {
           return acc;
         }, {});
         setPlayerStats(stats);
+        setPlayers(Array.from(playersSet));
       });
   }, [fromDate, toDate]);
 
@@ -62,24 +75,26 @@ export default function PlayerInsights() {
       <h1 className="text-xl font-bold mb-4">Player Insights</h1>
       <div>
         <label>Select Player:</label>
-        <select onChange={(e) => setSelectedPlayer(e.target.value)} value={selectedPlayer}>
+        <select onChange={(e) => setSelectedPlayer(e.target.value)} value={selectedPlayer} className="text-black">
           <option value="">Select a Player</option>
-          {Object.keys(playerStats).map((player, i) => (
+          {players.map((player, i) => (
             <option key={i} value={player}>{player}</option>
           ))}
         </select>
-        <div>
+        <div className="mt-2 mb-4">
           <label>From Date:</label>
           <input 
             type="date" 
             value={fromDate} 
             onChange={(e) => setFromDate(e.target.value)} 
+            className="bg-gray-700 text-white p-2"
           />
           <label>To Date:</label>
           <input 
             type="date" 
             value={toDate} 
             onChange={(e) => setToDate(e.target.value)} 
+            className="bg-gray-700 text-white p-2"
           />
         </div>
         {selectedPlayer && playerStats[selectedPlayer] && (
@@ -92,6 +107,8 @@ export default function PlayerInsights() {
             <p>Blacklisted Month/Year: {getMostFrequentMonth(playerStats[selectedPlayer].monthlyLosses)}</p>
             <p>Best Player to Partner With: {getBestOrWorstPlayer(playerStats[selectedPlayer], true)}</p>
             <p>Worst Player to Partner With: {getBestOrWorstPlayer(playerStats[selectedPlayer], false)}</p>
+            <p>Most Frequently Paired With: {Object.entries(playerStats[selectedPlayer].pairedWith).reduce((max, entry) => entry[1] > max[1] ? entry : max, ["", 0])[0]}</p>
+            <p>Least Frequently Paired With: {Object.entries(playerStats[selectedPlayer].pairedWith).reduce((min, entry) => entry[1] < min[1] ? entry : min, ["", Infinity])[0]}</p>
             {/* Add additional stats here as needed */}
           </div>
         )}
