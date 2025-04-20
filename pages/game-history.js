@@ -24,10 +24,10 @@ export default function GameHistory() {
     setForm({
       id: row[0],
       timestamp: row[1],
-      east: row[2], eastScore: row[3],
-      south: row[4], southScore: row[5],
-      west: row[6], westScore: row[7],
-      north: row[8], northScore: row[9],
+      eastNames: row[2], eastScore: row[3],
+      southNames: row[4], southScore: row[5],
+      westNames: row[6], westScore: row[7],
+      northNames: row[8], northScore: row[9],
     });
     setEditIndex(i);
   };
@@ -41,10 +41,10 @@ export default function GameHistory() {
     const updated = [...data];
     updated[editIndex] = [
       form.id, form.timestamp,
-      form.east, form.eastScore,
-      form.south, form.southScore,
-      form.west, form.westScore,
-      form.north, form.northScore
+      form.eastNames, form.eastScore,
+      form.southNames, form.southScore,
+      form.westNames, form.westScore,
+      form.northNames, form.northScore
     ];
     setData(updated);
     cancelEdit();
@@ -74,10 +74,54 @@ export default function GameHistory() {
                   <>
                     <td>{row[0]}</td>
                     <td>{row[1]}</td>
-                    <td><input value={form.east} onChange={(e) => handleChange("east", e.target.value)} /></td>
-                    <td><input value={form.south} onChange={(e) => handleChange("south", e.target.value)} /></td>
-                    <td><input value={form.west} onChange={(e) => handleChange("west", e.target.value)} /></td>
-                    <td><input value={form.north} onChange={(e) => handleChange("north", e.target.value)} /></td>
+                    <td>
+                      <input 
+                        value={form.eastNames} 
+                        onChange={(e) => handleChange("eastNames", e.target.value)} 
+                        placeholder="Player 1+Player 2"
+                      />
+                      <input 
+                        value={form.eastScore} 
+                        onChange={(e) => handleChange("eastScore", e.target.value)} 
+                        placeholder="Score"
+                      />
+                    </td>
+                    <td>
+                      <input 
+                        value={form.southNames} 
+                        onChange={(e) => handleChange("southNames", e.target.value)} 
+                        placeholder="Player 1+Player 2"
+                      />
+                      <input 
+                        value={form.southScore} 
+                        onChange={(e) => handleChange("southScore", e.target.value)} 
+                        placeholder="Score"
+                      />
+                    </td>
+                    <td>
+                      <input 
+                        value={form.westNames} 
+                        onChange={(e) => handleChange("westNames", e.target.value)} 
+                        placeholder="Player 1+Player 2"
+                      />
+                      <input 
+                        value={form.westScore} 
+                        onChange={(e) => handleChange("westScore", e.target.value)} 
+                        placeholder="Score"
+                      />
+                    </td>
+                    <td>
+                      <input 
+                        value={form.northNames} 
+                        onChange={(e) => handleChange("northNames", e.target.value)} 
+                        placeholder="Player 1+Player 2"
+                      />
+                      <input 
+                        value={form.northScore} 
+                        onChange={(e) => handleChange("northScore", e.target.value)} 
+                        placeholder="Score"
+                      />
+                    </td>
                     <td>
                       <button onClick={saveEdit}>✅</button>
                       <button onClick={cancelEdit}>❌</button>
