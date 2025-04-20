@@ -32,10 +32,7 @@ export default function GameHistory() {
         <table className="w-full border-collapse border border-gray-700">
           <thead className="bg-gray-800 text-white">
             <tr>
-              <th>ID</th><th>Time</th><th>East Player 1</th><th>East Player 2</th><th>East Score</th>
-              <th>South Player 1</th><th>South Player 2</th><th>South Score</th><th>West Player 1</th>
-              <th>West Player 2</th><th>West Score</th><th>North Player 1</th><th>North Player 2</th><th>North Score</th>
-              <th>Actions</th>
+              <th>ID</th><th>Time</th><th>East</th><th>South</th><th>West</th><th>North</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
