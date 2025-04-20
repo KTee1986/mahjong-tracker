@@ -32,34 +32,29 @@ export default function RunningTotal() {
   useEffect(() => {
     const totals = {};
 
-    // Loop through filtered data
     filteredData.forEach((row) => {
+      // Extract and split the player names
       const players = [
-        { name: row[2], score: parseInt(row[4], 10) },  // East Player & East Score
-        { name: row[3], score: parseInt(row[4], 10) },  // West Player & West Score
-        { name: row[5], score: parseInt(row[7], 10) },  // South Player & South Score
-        { name: row[6], score: parseInt(row[7], 10) },  // North Player & North Score
-        { name: row[8], score: parseInt(row[10], 10) }, // Another set of pairs...
-        { name: row[9], score: parseInt(row[10], 10) }, // Another set of pairs...
-        { name: row[11], score: parseInt(row[13], 10) },
-        { name: row[12], score: parseInt(row[13], 10) },
+        { names: row[2].split(" + "), score: parseInt(row[4], 10) },  // East Player & East Score
+        { names: row[3].split(" + "), score: parseInt(row[4], 10) },  // West Player & West Score
+        { names: row[5].split(" + "), score: parseInt(row[7], 10) },  // South Player & South Score
+        { names: row[6].split(" + "), score: parseInt(row[7], 10) },  // North Player & North Score
       ];
 
-      // Handle paired players: if East is paired with West, split their score
-      players.forEach((player, idx) => {
-        // Splitting score for paired players
-        if (idx % 2 === 0 && players[idx + 1]) {  // Pairing logic: East pairs with West, South with North
-          player.score = player.score / 2;
-          players[idx + 1].score = players[idx + 1].score / 2;
-        }
+      // Loop through each player set (for each position) and split the score between paired players
+      players.forEach((pair) => {
+        const splitScore = pair.score / pair.names.length;  // Divide score evenly for pairs
 
-        if (totals[player.name]) {
-          totals[player.name] += player.score;
-        } else {
-          totals[player.name] = player.score;
-        }
+        pair.names.forEach((player) => {
+          if (totals[player]) {
+            totals[player] += splitScore;
+          } else {
+            totals[player] = splitScore;
+          }
+        });
       });
     });
+
     setTotalScores(totals);
   }, [filteredData]);
 
