@@ -1,4 +1,3 @@
-
 import Layout from "../components/Layout";
 import { useState, useEffect } from "react";
 
@@ -33,18 +32,28 @@ export default function RunningTotal() {
   useEffect(() => {
     const totals = {};
     filteredData.forEach((row) => {
-      // Players from each seat, including partnered players
+      // Handle each row's score and pairings
       const players = [
-        { name: row[2], score: parseInt(row[4]) / (row[3] ? 2 : 1) },
-        { name: row[3], score: parseInt(row[4]) / (row[3] ? 2 : 1) },
-        { name: row[5], score: parseInt(row[7]) / (row[6] ? 2 : 1) },
-        { name: row[6], score: parseInt(row[7]) / (row[6] ? 2 : 1) },
-        { name: row[8], score: parseInt(row[10]) / (row[9] ? 2 : 1) },
-        { name: row[9], score: parseInt(row[10]) / (row[9] ? 2 : 1) },
-        { name: row[11], score: parseInt(row[13]) / (row[12] ? 2 : 1) },
-        { name: row[12], score: parseInt(row[13]) / (row[12] ? 2 : 1) },
+        { name: row[2], score: parseInt(row[4]) },
+        { name: row[3], score: parseInt(row[4]) },
+        { name: row[5], score: parseInt(row[7]) },
+        { name: row[6], score: parseInt(row[7]) },
+        { name: row[8], score: parseInt(row[10]) },
+        { name: row[9], score: parseInt(row[10]) },
+        { name: row[11], score: parseInt(row[13]) },
+        { name: row[12], score: parseInt(row[13]) },
       ];
-      players.forEach((player) => {
+
+      // Split the score for pairs
+      players.forEach((player, idx) => {
+        if (idx % 2 === 0) {  // If East/South are paired with West/North
+          const partnerIdx = idx + 1; // Partnering logic (East pairs with West, South with North)
+          if (player && players[partnerIdx]) {
+            player.score = player.score / 2; // Split the score between paired players
+            players[partnerIdx].score = players[partnerIdx].score / 2;
+          }
+        }
+        
         if (totals[player.name]) {
           totals[player.name] += player.score;
         } else {
