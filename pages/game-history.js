@@ -24,10 +24,10 @@ export default function GameHistory() {
     setForm({
       id: row[0],
       timestamp: row[1],
-      eastNames: row[2], eastScore: row[3],
-      southNames: row[4], southScore: row[5],
-      westNames: row[6], westScore: row[7],
-      northNames: row[8], northScore: row[9],
+      eastPlayer1: row[2], eastPlayer2: row[3], eastScore: row[4],
+      southPlayer1: row[5], southPlayer2: row[6], southScore: row[7],
+      westPlayer1: row[8], westPlayer2: row[9], westScore: row[10],
+      northPlayer1: row[11], northPlayer2: row[12], northScore: row[13],
     });
     setEditIndex(i);
   };
@@ -41,10 +41,10 @@ export default function GameHistory() {
     const updated = [...data];
     updated[editIndex] = [
       form.id, form.timestamp,
-      form.eastNames, form.eastScore,
-      form.southNames, form.southScore,
-      form.westNames, form.westScore,
-      form.northNames, form.northScore
+      form.eastPlayer1, form.eastPlayer2, form.eastScore,
+      form.southPlayer1, form.southPlayer2, form.southScore,
+      form.westPlayer1, form.westPlayer2, form.westScore,
+      form.northPlayer1, form.northPlayer2, form.northScore
     ];
     setData(updated);
     cancelEdit();
@@ -57,6 +57,11 @@ export default function GameHistory() {
     }
   };
 
+  const formatDate = (dateStr) => {
+    const date = new Date(dateStr);
+    return date.toISOString().split("T")[0]; // YYYY-MM-DD format
+  };
+
   return (
     <Layout>
       <h1 className="text-xl font-bold mb-4">Game History</h1>
@@ -64,7 +69,10 @@ export default function GameHistory() {
         <table className="w-full border-collapse border border-gray-700">
           <thead className="bg-gray-800 text-white">
             <tr>
-              <th>ID</th><th>Time</th><th>East</th><th>South</th><th>West</th><th>North</th><th>Actions</th>
+              <th>ID</th><th>Time</th><th>East Player 1</th><th>East Player 2</th><th>East Score</th>
+              <th>South Player 1</th><th>South Player 2</th><th>South Score</th><th>West Player 1</th>
+              <th>West Player 2</th><th>West Score</th><th>North Player 1</th><th>North Player 2</th><th>North Score</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -73,53 +81,73 @@ export default function GameHistory() {
                 {editIndex === i ? (
                   <>
                     <td>{row[0]}</td>
-                    <td>{row[1]}</td>
+                    <td>{formatDate(row[1])}</td>
                     <td>
                       <input 
-                        value={form.eastNames} 
-                        onChange={(e) => handleChange("eastNames", e.target.value)} 
-                        placeholder="Player 1+Player 2"
+                        value={form.eastPlayer1} 
+                        onChange={(e) => handleChange("eastPlayer1", e.target.value)} 
+                        placeholder="Player 1" 
+                      />
+                      <input 
+                        value={form.eastPlayer2} 
+                        onChange={(e) => handleChange("eastPlayer2", e.target.value)} 
+                        placeholder="Player 2" 
                       />
                       <input 
                         value={form.eastScore} 
                         onChange={(e) => handleChange("eastScore", e.target.value)} 
-                        placeholder="Score"
+                        placeholder="Score" 
                       />
                     </td>
                     <td>
                       <input 
-                        value={form.southNames} 
-                        onChange={(e) => handleChange("southNames", e.target.value)} 
-                        placeholder="Player 1+Player 2"
+                        value={form.southPlayer1} 
+                        onChange={(e) => handleChange("southPlayer1", e.target.value)} 
+                        placeholder="Player 1" 
+                      />
+                      <input 
+                        value={form.southPlayer2} 
+                        onChange={(e) => handleChange("southPlayer2", e.target.value)} 
+                        placeholder="Player 2" 
                       />
                       <input 
                         value={form.southScore} 
                         onChange={(e) => handleChange("southScore", e.target.value)} 
-                        placeholder="Score"
+                        placeholder="Score" 
                       />
                     </td>
                     <td>
                       <input 
-                        value={form.westNames} 
-                        onChange={(e) => handleChange("westNames", e.target.value)} 
-                        placeholder="Player 1+Player 2"
+                        value={form.westPlayer1} 
+                        onChange={(e) => handleChange("westPlayer1", e.target.value)} 
+                        placeholder="Player 1" 
+                      />
+                      <input 
+                        value={form.westPlayer2} 
+                        onChange={(e) => handleChange("westPlayer2", e.target.value)} 
+                        placeholder="Player 2" 
                       />
                       <input 
                         value={form.westScore} 
                         onChange={(e) => handleChange("westScore", e.target.value)} 
-                        placeholder="Score"
+                        placeholder="Score" 
                       />
                     </td>
                     <td>
                       <input 
-                        value={form.northNames} 
-                        onChange={(e) => handleChange("northNames", e.target.value)} 
-                        placeholder="Player 1+Player 2"
+                        value={form.northPlayer1} 
+                        onChange={(e) => handleChange("northPlayer1", e.target.value)} 
+                        placeholder="Player 1" 
+                      />
+                      <input 
+                        value={form.northPlayer2} 
+                        onChange={(e) => handleChange("northPlayer2", e.target.value)} 
+                        placeholder="Player 2" 
                       />
                       <input 
                         value={form.northScore} 
                         onChange={(e) => handleChange("northScore", e.target.value)} 
-                        placeholder="Score"
+                        placeholder="Score" 
                       />
                     </td>
                     <td>
@@ -130,11 +158,11 @@ export default function GameHistory() {
                 ) : (
                   <>
                     <td>{row[0]}</td>
-                    <td>{row[1]}</td>
-                    <td>{row[2]} ({row[3]})</td>
-                    <td>{row[4]} ({row[5]})</td>
-                    <td>{row[6]} ({row[7]})</td>
-                    <td>{row[8]} ({row[9]})</td>
+                    <td>{formatDate(row[1])}</td>
+                    <td>{row[2]} & {row[3]} ({row[4]})</td>
+                    <td>{row[5]} & {row[6]} ({row[7]})</td>
+                    <td>{row[8]} & {row[9]} ({row[10]})</td>
+                    <td>{row[11]} & {row[12]} ({row[13]})</td>
                     <td>
                       <button onClick={() => startEdit(i)}>✏️</button>
                       <button onClick={() => deleteRow(i)}>🗑️</button>
