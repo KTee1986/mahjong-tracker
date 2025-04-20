@@ -4,26 +4,30 @@ import { useEffect, useState } from "react";
 
 export default function GameHistory() {
   const [data, setData] = useState([]);
+    const [currentPage, setCurrentPage] = useState(1);
+  const rowsPerPage = 50;
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     fetch("/api/sheet")
       .then((res) => res.json())
       .then(({ data }) => {
-        setData(data.slice(1)); // Skip header row
+        setData(data.slice(1)); // Ignore header row
+        setTotalPages(Math.ceil(data.length / rowsPerPage));
       });
   }, []);
 
-  const deleteRow = (i) => {
-    if (window.confirm('Are you sure you want to delete this record?')) {
-      const updated = data.filter((_, idx) => idx !== i);
-      setData(updated);
-    }
-  };
 
   const formatDate = (dateStr) => {
     const date = new Date(dateStr);
     return date.toISOString().split("T")[0]; // Format to YYYY-MM-DD
   };
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const currentData = data.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
   return (
     <Layout>
@@ -32,12 +36,11 @@ export default function GameHistory() {
         <table className="w-full border-collapse border border-gray-700">
           <thead className="bg-gray-800 text-white">
             <tr>
-              <th>ID</th><th>Time</th><th>East</th><th>East Score</th>
-              <th>South Player</th><th>South Score</th><th>West Player</th><th>West Score</th><th>North Player</th><th>North Score</th>
+              <th>ID</th><th>Time</th><th>East</th><th>South</th><th>West</th><th>North</th>
             </tr>
           </thead>
           <tbody>
-            {data.map((row, i) => (
+            {currentData.map((row, i) => (
               <tr key={i} className="border-t border-gray-700">
                 <td>{row[0]}</td>
                 <td>{formatDate(row[1])}</td>
@@ -49,6 +52,25 @@ export default function GameHistory() {
             ))}
           </tbody>
         </table>
+      </div>
+      <div className="flex justify-between mt-4">
+        <button
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="bg-gray-500 text-white p-2 rounded"
+        >
+          Previous
+        </button>
+        <div className="flex items-center">
+          Page {currentPage} of {totalPages}
+        </div>
+        <button
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className="bg-gray-500 text-white p-2 rounded"
+        >
+          Next
+        </button>
       </div>
     </Layout>
   );
