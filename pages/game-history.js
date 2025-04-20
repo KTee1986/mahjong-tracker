@@ -55,10 +55,10 @@ export default function GameHistory() {
               <tr key={i} className="border-t border-gray-700">
                 <td>{row[0]}</td>
                 <td>{formatDate(row[1])}</td>
-                <td>{row[2]} & {row[3]} ({row[4]})</td>
-                <td>{row[5]} & {row[6]} ({row[7]})</td>
-                <td>{row[8]} & {row[9]} ({row[10]})</td>
-                <td>{row[11]} & {row[12]} ({row[13]})</td>
+                <td>{row[2]} ({row[3]})</td>
+                <td>{row[4]} ({row[5]})</td>
+                <td>{row[6]} ({row[7]})</td>
+                <td>{row[8]} ({row[9]})</td>
                 <td>
                   <button onClick={() => handleDelete(row[0])} className="text-red-500">Delete</button>
                 </td>
