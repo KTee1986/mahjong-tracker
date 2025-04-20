@@ -1,10 +1,10 @@
 
 import Layout from "../components/Layout";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function GameHistory() {
   const [data, setData] = useState([]);
-    const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 50;
   const [totalPages, setTotalPages] = useState(1);
 
@@ -17,7 +17,6 @@ export default function GameHistory() {
       });
   }, []);
 
-
   const formatDate = (dateStr) => {
     const date = new Date(dateStr);
     return date.toISOString().split("T")[0]; // Format to YYYY-MM-DD
@@ -25,6 +24,18 @@ export default function GameHistory() {
 
   const handlePageChange = (pageNumber) => {
     setCurrentPage(pageNumber);
+  };
+
+  const handleDelete = (id) => {
+    if (window.confirm("Are you sure you want to delete this record?")) {
+      fetch(`/api/sheet/${id}`, { method: "DELETE" })
+        .then(() => {
+          setData(data.filter((row) => row[0] !== id)); // Update the data state by removing the deleted record
+        })
+        .catch((error) => {
+          console.error("Error deleting record:", error);
+        });
+    }
   };
 
   const currentData = data.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
