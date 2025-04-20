@@ -47,10 +47,6 @@ export default function Stats() {
           highest: s.highest.toFixed(2),
           lowest: s.lowest.toFixed(2),
         }));
-		
-		// *** ADDED SORTING LOGIC HERE ***
-        // Sort by the numeric win rate in descending order
-        table.sort((a, b) => b.winRateNum - a.winRateNum);
 
         setRows(table);
       });
