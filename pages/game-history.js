@@ -11,7 +11,7 @@ export default function GameHistory() {
     fetch("/api/sheet")
       .then((res) => res.json())
       .then(({ data }) => {
-        setData(data.slice(1));
+        setData(data.slice(1)); // Skip header row
       });
   }, []);
 
@@ -59,7 +59,7 @@ export default function GameHistory() {
 
   const formatDate = (dateStr) => {
     const date = new Date(dateStr);
-    return date.toISOString().split("T")[0]; // YYYY-MM-DD format
+    return date.toISOString().split("T")[0]; // Format to YYYY-MM-DD
   };
 
   return (
