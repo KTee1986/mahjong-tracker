@@ -33,15 +33,16 @@ export default function RunningTotal() {
   useEffect(() => {
     const totals = {};
     filteredData.forEach((row) => {
+      // Players from each seat, including partnered players
       const players = [
-        { name: row[2], score: parseInt(row[4]) },
-        { name: row[3], score: parseInt(row[4]) },
-        { name: row[5], score: parseInt(row[7]) },
-        { name: row[6], score: parseInt(row[7]) },
-        { name: row[8], score: parseInt(row[10]) },
-        { name: row[9], score: parseInt(row[10]) },
-        { name: row[11], score: parseInt(row[13]) },
-        { name: row[12], score: parseInt(row[13]) },
+        { name: row[2], score: parseInt(row[4]) / (row[3] ? 2 : 1) },
+        { name: row[3], score: parseInt(row[4]) / (row[3] ? 2 : 1) },
+        { name: row[5], score: parseInt(row[7]) / (row[6] ? 2 : 1) },
+        { name: row[6], score: parseInt(row[7]) / (row[6] ? 2 : 1) },
+        { name: row[8], score: parseInt(row[10]) / (row[9] ? 2 : 1) },
+        { name: row[9], score: parseInt(row[10]) / (row[9] ? 2 : 1) },
+        { name: row[11], score: parseInt(row[13]) / (row[12] ? 2 : 1) },
+        { name: row[12], score: parseInt(row[13]) / (row[12] ? 2 : 1) },
       ];
       players.forEach((player) => {
         if (totals[player.name]) {
