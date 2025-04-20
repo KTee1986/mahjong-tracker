@@ -26,6 +26,18 @@ export default function GameHistory() {
     setCurrentPage(pageNumber);
   };
 
+  const handleDelete = (id) => {
+    if (window.confirm("Are you sure you want to delete this record?")) {
+      fetch(`/api/sheet/${id}`, { method: "DELETE" })
+        .then(() => {
+          setData(data.filter((row) => row[0] !== id)); // Update the data state by removing the deleted record
+        })
+        .catch((error) => {
+          console.error("Error deleting record:", error);
+        });
+    }
+  };
+
   const currentData = data.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
   return (
@@ -48,8 +60,7 @@ export default function GameHistory() {
                 <td>{row[8]} & {row[9]} ({row[10]})</td>
                 <td>{row[11]} & {row[12]} ({row[13]})</td>
                 <td>
-                  {/* Add actions like Edit/Delete here */}
-                  <button className="text-red-500">Delete</button>
+                  <button onClick={() => handleDelete(row[0])} className="text-red-500">Delete</button>
                 </td>
               </tr>
             ))}

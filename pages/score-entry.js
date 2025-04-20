@@ -4,198 +4,155 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 
 export default function ScoreEntry() {
-  const [players, setPlayers] = useState([]);
-  const [playerSuggestions, setPlayerSuggestions] = useState([]);
-  const [form, setForm] = useState({
-    eastPlayer1: "",
-    eastPlayer2: "",
-    southPlayer1: "",
-    southPlayer2: "",
-    westPlayer1: "",
-    westPlayer2: "",
-    northPlayer1: "",
-    northPlayer2: "",
-    eastScore: "",
-    southScore: "",
-    westScore: "",
-    northScore: "",
-  });
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [adminPassword, setAdminPassword] = useState("");
+  const [isAdmin, setIsAdmin] = useState(null);
+  const [eastPlayer1, setEastPlayer1] = useState("");
+  const [eastPlayer2, setEastPlayer2] = useState("");
+  const [eastScore, setEastScore] = useState("");
+  const [southPlayer1, setSouthPlayer1] = useState("");
+  const [southPlayer2, setSouthPlayer2] = useState("");
+  const [southScore, setSouthScore] = useState("");
+  const [westPlayer1, setWestPlayer1] = useState("");
+  const [westPlayer2, setWestPlayer2] = useState("");
+  const [westScore, setWestScore] = useState("");
+  const [northPlayer1, setNorthPlayer1] = useState("");
+  const [northPlayer2, setNorthPlayer2] = useState("");
+  const [northScore, setNorthScore] = useState("");
   const router = useRouter();
 
   useEffect(() => {
-    if (sessionStorage.getItem("admin") === "true") {
+    const admin = sessionStorage.getItem("admin");
+    if (admin !== "true") {
+      router.replace("/login");
+    } else {
       setIsAdmin(true);
     }
-    fetch("/api/sheet")
-      .then((res) => res.json())
-      .then(({ data }) => {
-        const playersSet = new Set();
-        data.slice(1).forEach((row) => {
-          playersSet.add(row[2]); // Add East Player 1
-          playersSet.add(row[3]); // Add East Player 2
-          playersSet.add(row[5]); // Add South Player 1
-          playersSet.add(row[6]); // Add South Player 2
-          playersSet.add(row[8]); // Add West Player 1
-          playersSet.add(row[9]); // Add West Player 2
-          playersSet.add(row[11]); // Add North Player 1
-          playersSet.add(row[12]); // Add North Player 2
-        });
-        setPlayers(Array.from(playersSet)); // Convert set to array
-      });
   }, []);
-
-  const handleInputChange = (e, field) => {
-    const { value } = e.target;
-    setForm((prev) => ({ ...prev, [field]: value }));
-    if (value) {
-      setPlayerSuggestions(
-        players.filter((player) => player.toLowerCase().includes(value.toLowerCase()))
-      );
-    } else {
-      setPlayerSuggestions([]);
-    }
-  };
-
-  const handlePlayerSelection = (selectedPlayer, field) => {
-    setForm((prev) => ({ ...prev, [field]: selectedPlayer }));
-    setPlayerSuggestions([]);
-  };
-
-  const handleLogin = () => {
-    if (adminPassword === "admin_password") { // Replace with your actual admin password
-      sessionStorage.setItem("admin", "true");
-      setIsAdmin(true);
-    } else {
-      alert("Invalid password!");
-    }
-  };
-
-  const handleLogout = () => {
-    sessionStorage.removeItem("admin");
-    setIsAdmin(false);
-    router.push("/login"); // Redirect to login page after logout
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Submit form logic to API
-    console.log(form);
+    const gameData = {
+      east: { player1: eastPlayer1, player2: eastPlayer2, score: eastScore },
+      south: { player1: southPlayer1, player2: southPlayer2, score: southScore },
+      west: { player1: westPlayer1, player2: westPlayer2, score: westScore },
+      north: { player1: northPlayer1, player2: northPlayer2, score: northScore },
+      timestamp: new Date().toISOString(),
+    };
+    await fetch("/api/sheet", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(gameData),
+    });
+    // Reset form after submission
+    setEastPlayer1("");
+    setEastPlayer2("");
+    setEastScore("");
+    setSouthPlayer1("");
+    setSouthPlayer2("");
+    setSouthScore("");
+    setWestPlayer1("");
+    setWestPlayer2("");
+    setWestScore("");
+    setNorthPlayer1("");
+    setNorthPlayer2("");
+    setNorthScore("");
   };
+
+  if (isAdmin === null) return null; // Wait for login check
 
   return (
     <Layout>
       <h1 className="text-xl font-bold mb-4">Score Entry</h1>
-      {isAdmin ? (
-        <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-2 gap-4">
-            {/* East Section */}
-            <div className="flex flex-col">
-              <label>East Player 1</label>
-              <input 
-                type="text" 
-                value={form.eastPlayer1} 
-                onChange={(e) => handleInputChange(e, "eastPlayer1")} 
-                placeholder="Enter Player 1" 
-              />
-              {playerSuggestions.length > 0 && (
-                <ul className="border bg-gray-700 text-white p-2 max-h-40 overflow-y-auto">
-                  {playerSuggestions.map((player) => (
-                    <li
-                      key={player}
-                      onClick={() => handlePlayerSelection(player, "eastPlayer1")}
-                      className="cursor-pointer hover:bg-gray-600 p-1"
-                    >
-                      {player}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div className="flex flex-col">
-              <label>East Player 2</label>
-              <input 
-                type="text" 
-                value={form.eastPlayer2} 
-                onChange={(e) => handleInputChange(e, "eastPlayer2")} 
-                placeholder="Enter Player 2" 
-              />
-              {playerSuggestions.length > 0 && (
-                <ul className="border bg-gray-700 text-white p-2 max-h-40 overflow-y-auto">
-                  {playerSuggestions.map((player) => (
-                    <li
-                      key={player}
-                      onClick={() => handlePlayerSelection(player, "eastPlayer2")}
-                      className="cursor-pointer hover:bg-gray-600 p-1"
-                    >
-                      {player}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            {/* Repeat for South, West, North */}
-
-            {/* Score Inputs */}
-            <div className="flex flex-col">
-              <label>East Score</label>
-              <input
-                type="number"
-                value={form.eastScore}
-                onChange={(e) => setForm({ ...form, eastScore: e.target.value })}
-                placeholder="Enter Score"
-              />
-            </div>
-
-            <div className="flex flex-col">
-              <label>South Score</label>
-              <input
-                type="number"
-                value={form.southScore}
-                onChange={(e) => setForm({ ...form, southScore: e.target.value })}
-                placeholder="Enter Score"
-              />
-            </div>
-
-            <div className="flex flex-col">
-              <label>West Score</label>
-              <input
-                type="number"
-                value={form.westScore}
-                onChange={(e) => setForm({ ...form, westScore: e.target.value })}
-                placeholder="Enter Score"
-              />
-            </div>
-
-            <div className="flex flex-col">
-              <label>North Score</label>
-              <input
-                type="number"
-                value={form.northScore}
-                onChange={(e) => setForm({ ...form, northScore: e.target.value })}
-                placeholder="Enter Score"
-              />
-            </div>
-
-            <button type="submit" className="bg-blue-500 text-white p-2 mt-4">Submit</button>
-          </div>
-          <button onClick={handleLogout} className="bg-red-500 text-white p-2 mt-4">Logout</button>
-        </form>
-      ) : (
-        <div className="flex flex-col items-center">
-          <h2>Please Log in</h2>
-          <input 
-            type="password" 
-            value={adminPassword} 
-            onChange={(e) => setAdminPassword(e.target.value)} 
-            placeholder="Enter Admin Password" 
-            className="border p-2 mt-2"
+      <form onSubmit={handleSubmit}>
+        <div>
+          <label>East Players:</label>
+          <input
+            type="text"
+            value={eastPlayer1}
+            onChange={(e) => setEastPlayer1(e.target.value)}
+            placeholder="Player 1"
           />
-          <button onClick={handleLogin} className="bg-green-500 text-white p-2 mt-2">Login</button>
+          <input
+            type="text"
+            value={eastPlayer2}
+            onChange={(e) => setEastPlayer2(e.target.value)}
+            placeholder="Player 2"
+          />
+          <input
+            type="number"
+            value={eastScore}
+            onChange={(e) => setEastScore(e.target.value)}
+            placeholder="Score"
+          />
         </div>
-      )}
+        <div>
+          <label>South Players:</label>
+          <input
+            type="text"
+            value={southPlayer1}
+            onChange={(e) => setSouthPlayer1(e.target.value)}
+            placeholder="Player 1"
+          />
+          <input
+            type="text"
+            value={southPlayer2}
+            onChange={(e) => setSouthPlayer2(e.target.value)}
+            placeholder="Player 2"
+          />
+          <input
+            type="number"
+            value={southScore}
+            onChange={(e) => setSouthScore(e.target.value)}
+            placeholder="Score"
+          />
+        </div>
+        <div>
+          <label>West Players:</label>
+          <input
+            type="text"
+            value={westPlayer1}
+            onChange={(e) => setWestPlayer1(e.target.value)}
+            placeholder="Player 1"
+          />
+          <input
+            type="text"
+            value={westPlayer2}
+            onChange={(e) => setWestPlayer2(e.target.value)}
+            placeholder="Player 2"
+          />
+          <input
+            type="number"
+            value={westScore}
+            onChange={(e) => setWestScore(e.target.value)}
+            placeholder="Score"
+          />
+        </div>
+        <div>
+          <label>North Players:</label>
+          <input
+            type="text"
+            value={northPlayer1}
+            onChange={(e) => setNorthPlayer1(e.target.value)}
+            placeholder="Player 1"
+          />
+          <input
+            type="text"
+            value={northPlayer2}
+            onChange={(e) => setNorthPlayer2(e.target.value)}
+            placeholder="Player 2"
+          />
+          <input
+            type="number"
+            value={northScore}
+            onChange={(e) => setNorthScore(e.target.value)}
+            placeholder="Score"
+          />
+        </div>
+        <button type="submit" className="mt-4 bg-blue-500 text-white p-2 rounded">
+          Submit Score
+        </button>
+      </form>
     </Layout>
   );
 }
