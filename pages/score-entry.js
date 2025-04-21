@@ -63,7 +63,7 @@ export default function ScoreEntry() {
     for (const color in counts) {
       total += counts[color] * colorValues[color];
     }
-    setScores((prevScores) => ({ ...prevScores, [seat]: total.toFixed(1) }); // Keep 1 decimal place
+    setScores((prevScores) => ({ ...prevScores, [seat]: total.toFixed(1) })); // Corrected: comma instead of semicolon
   };
 
   const calculateTotal = () =>
