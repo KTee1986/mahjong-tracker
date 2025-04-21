@@ -8,7 +8,6 @@ const seats = ["East", "South", "West", "North"];
 export default function ScoreEntry() {
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(null);
-
   const [players, setPlayers] = useState({
     East: ["", ""],
     South: ["", ""],
@@ -16,8 +15,7 @@ export default function ScoreEntry() {
     North: ["", ""],
   });
   const [scores, setScores] = useState({ East: "", South: "", West: "", North: "" });
-  const [suggestions, setSuggestions] = useState([]);
-  const [allNames, setAllNames] = useState([]);
+  const [availablePlayers, setAvailablePlayers] = useState([]); // Fetch from /api/players
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -28,10 +26,10 @@ export default function ScoreEntry() {
   }, [router]);
 
   useEffect(() => {
-    fetch("/api/players")  // Fetch from the correct API endpoint
+    fetch("/api/players")
       .then((res) => res.json())
       .then(({ data }) => {
-        setAllNames(data.map(player => player.name)); // Extract names
+        setAvailablePlayers(data);
       })
       .catch((err) => {
         setError("Error fetching players.");
@@ -39,15 +37,10 @@ export default function ScoreEntry() {
       });
   }, []);
 
-  const handleInput = (seat, index, value) => {
+  const handlePlayerSelect = (seat, index, playerName) => {
     const newPlayers = { ...players };
-    newPlayers[seat][index] = value;
+    newPlayers[seat][index] = playerName;
     setPlayers(newPlayers);
-    if (value.length > 0) {
-      setSuggestions(allNames.filter((n) => n.toLowerCase().startsWith(value.toLowerCase())));
-    } else {
-      setSuggestions([]);
-    }
   };
 
   const handleScoreInput = (seat, value) => {
@@ -116,22 +109,21 @@ export default function ScoreEntry() {
           <label className="block font-semibold">{seat} Players</label>
           <div className="flex gap-2">
             {[0, 1].map((i) => (
-              <input
-                key={i}
-                type="text"
-                value={players[seat][i]}
-                onChange={(e) => handleInput(seat, i, e.target.value)}
-                className="w-full p-2 rounded bg-gray-800 text-white mt-1"
-                placeholder={`Player ${i + 1}`}
-                list={`autocomplete-${seat}-${i}`}
-              />
+              <div key={i}>
+                {availablePlayers.map((player) => (
+                  <button
+                    key={player.id}
+                    onClick={() => handlePlayerSelect(seat, i, player.name)}
+                    className={`block w-full p-2 rounded bg-gray-800 text-white mt-1 mb-1 ${
+                      players[seat][i] === player.name ? "bg-blue-600" : "hover:bg-gray-700"
+                    }`}
+                  >
+                    {player.name}
+                  </button>
+                ))}
+              </div>
             ))}
           </div>
-          <datalist id={`autocomplete-${seat}-0`}>
-            {Array.isArray(suggestions) && suggestions.map((name) => (
-              <option key={name} value={name} />
-            ))}
-          </datalist>
 
           <label className="block font-semibold mt-2">{seat} Score</label>
           <input
