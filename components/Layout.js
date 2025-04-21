@@ -11,6 +11,7 @@ const navItems = [
   { label: "Stats", path: "/stats" },
   { label: "Advanced Stats", path: "/advanced-stats" },
   { label: "Head-to-Head", path: "/head-to-head" },
+  { label: "Player List", path: "/player-list" },
 ];
 
 export default function Layout({ children }) {
