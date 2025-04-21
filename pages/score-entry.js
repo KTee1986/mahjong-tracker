@@ -39,7 +39,7 @@ export default function ScoreEntry() {
 
   const handlePlayerSelect = (seat, index, playerName) => {
     const newPlayers = { ...players };
-    newPlayers[seat][index] = playerName;
+    newPlayers[seat][index] = playerName === players[seat][index] ? "" : playerName; // Toggle selection
     setPlayers(newPlayers);
   };
 
