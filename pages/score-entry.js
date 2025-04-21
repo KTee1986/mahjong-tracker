@@ -125,7 +125,7 @@ export default function ScoreEntry() {
                     key={player.id}
                     onClick={() => handlePlayerSelect(seat, 0, player.name)}
                     className={`px-2 py-1 rounded text-xs mt-1 mb-1 text-center whitespace-nowrap ${
-                      players[seat][0] === player.name ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300"
+                      players[seat][0] === player.name ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300 text-black"
                     }`}
                     style={{ minWidth: "4ch" }} // Minimum width to prevent collapsing
                   >
@@ -145,7 +145,7 @@ export default function ScoreEntry() {
                     key={player.id}
                     onClick={() => handlePlayerSelect(seat, 1, player.name)}
                     className={`px-2 py-1 rounded text-xs mt-1 mb-1 text-center whitespace-nowrap ${
-                      players[seat][1] === player.name ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300"
+                      players[seat][1] === player.name ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300 text-black"
                     }`}
                     style={{ minWidth: "4ch" }}
                   >
