@@ -1,4 +1,3 @@
-
 import Layout from "../components/Layout";
 import { useState, useEffect } from "react";
 
@@ -12,8 +11,11 @@ export default function GameHistory() {
     fetch("/api/sheet")
       .then((res) => res.json())
       .then(({ data }) => {
-        setData(data.slice(1)); // Ignore header row
-        setTotalPages(Math.ceil(data.length / rowsPerPage));
+        const slicedData = data.slice(1); // Ignore header row
+        // Sort data by date in descending order (latest first)
+        const sortedData = slicedData.sort((a, b) => new Date(b[1]) - new Date(a[1]));
+        setData(sortedData);
+        setTotalPages(Math.ceil(sortedData.length / rowsPerPage));
       });
   }, []);
 
@@ -24,18 +26,6 @@ export default function GameHistory() {
 
   const handlePageChange = (pageNumber) => {
     setCurrentPage(pageNumber);
-  };
-
-  const handleDelete = (id) => {
-    if (window.confirm("Are you sure you want to delete this record?")) {
-      fetch(`/api/sheet/${id}`, { method: "DELETE" })
-        .then(() => {
-          setData(data.filter((row) => row[0] !== id)); // Update the data state by removing the deleted record
-        })
-        .catch((error) => {
-          console.error("Error deleting record:", error);
-        });
-    }
   };
 
   const currentData = data.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
@@ -54,7 +44,7 @@ export default function GameHistory() {
             {currentData.map((row, i) => (
               <tr key={i} className="border-t border-gray-700">
                 <td>{row[0]}</td>
-                <td>{formatDate(row[1])}</td>
+                <td>{formatDate(row[1])</td>
                 <td>{row[2]} ({row[3]})</td>
                 <td>{row[4]} ({row[5]})</td>
                 <td>{row[6]} ({row[7]})</td>
@@ -77,7 +67,7 @@ export default function GameHistory() {
         </div>
         <button
           onClick={() => handlePageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
+          disabled={currentPage === totalPages || totalPages === 0}
           className="bg-gray-500 text-white p-2 rounded"
         >
           Next
