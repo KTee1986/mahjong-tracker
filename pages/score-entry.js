@@ -22,10 +22,22 @@ export default function ScoreEntry() {
     West: { Red: 0, Blue: 0, Green: 0, White: 0 },
     North: { Red: 0, Blue: 0, Green: 0, White: 0 },
   });
-  const [scores, setScores] = useState({ East: 0, South: 0, West: 0, North: 0 });
+  const [totalValues, setTotalValues] = useState({  // Renamed from scores to totalValues
+    East: 0,
+    South: 0,
+    West: 0,
+    North: 0,
+  });
+  const [scores, setScores] = useState({  // New state for scores (total - 200)
+    East: -200,
+    South: -200,
+    West: -200,
+    North: -200,
+  });
   const [availablePlayers, setAvailablePlayers] = useState([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [sumOfScores, setSumOfScores] = useState(-800); // Initialize to -800 (4 seats * -200)
 
   useEffect(() => {
     const admin = sessionStorage.getItem("admin");
@@ -53,33 +65,35 @@ export default function ScoreEntry() {
 
   const handleColorChange = (seat, color, value) => {
     const newColorCounts = { ...colorCounts };
-    newColorCounts[seat][color] = parseFloat(value || 0); // Use parseFloat for decimal
+    newColorCounts[seat][color] = parseFloat(value || 0);
     setColorCounts(newColorCounts);
-    calculateScore(seat, newColorCounts[seat]);
+    calculateValues(seat, newColorCounts[seat]);
   };
 
-  const calculateScore = (seat, counts) => {
+  const calculateValues = (seat, counts) => {
     let total = 0;
     for (const color in counts) {
       total += counts[color] * colorValues[color];
     }
-    setScores((prevScores) => ({ ...prevScores, [seat]: total.toFixed(1) })); // Corrected: comma instead of semicolon
+    setTotalValues((prevTotalValues) => ({ ...prevTotalValues, [seat]: parseFloat(total.toFixed(1)) })); // Store total
+    setScores((prevScores) => ({ ...prevScores, [seat]: parseFloat((total - 200).toFixed(1)) })); // Store total - 200
   };
 
-  const calculateTotal = () =>
-    Object.values(scores).reduce((sum, val) => sum + parseFloat(val || 0), 0).toFixed(1); // Keep 1 decimal place
+  useEffect(() => {
+    const newSum = Object.values(scores).reduce((sum, score) => sum + parseFloat(score || 0), 0);
+    setSumOfScores(parseFloat(newSum.toFixed(1)));
+  }, [scores]);
 
   const handleSubmit = async () => {
     setError("");
     setMessage("");
-    const total = calculateTotal();
 
-    if (parseFloat(total) !== 0) {
-      setError("Scores must sum to 0.");
+    if (parseFloat(sumOfScores.toFixed(1)) !== 0) {  // Validation against sumOfScores
+      setError("Sum of scores must be 0.");
       return;
     }
 
-    const filled = seats.filter((s) => (players[s][0] || players[s][1]) && parseFloat(scores[s]) !== 0);
+    const filled = seats.filter((s) => (players[s][0] || players[s][1]) && parseFloat(totalValues[s]) !== 0);
     if (filled.length < 2) {
       setError("At least two seats must be filled.");
       return;
@@ -90,7 +104,7 @@ export default function ScoreEntry() {
     for (let seat of seats) {
       const p = players[seat].filter(Boolean).join(" + ");
       flatPlayers[seat] = p;
-      adjustedScores[seat] = (parseFloat(scores[seat]) - 200).toFixed(1); // Keep 1 decimal place
+      adjustedScores[seat] = parseFloat(scores[seat].toFixed(1)); // Send adjusted scores
     }
 
     try {
@@ -115,7 +129,19 @@ export default function ScoreEntry() {
           West: { Red: 0, Blue: 0, Green: 0, White: 0 },
           North: { Red: 0, Blue: 0, Green: 0, White: 0 },
         });
-        setScores({ East: 0, South: 0, West: 0, North: 0 });
+        setTotalValues({
+          East: 0,
+          South: 0,
+          West: 0,
+          North: 0,
+        });
+        setScores({
+          East: -200,
+          South: -200,
+          West: -200,
+          North: -200,
+        });
+        setSumOfScores(-800);
       } else {
         setError(data.error || "Error submitting game.");
       }
@@ -183,7 +209,7 @@ export default function ScoreEntry() {
             </div>
           </div>
 
-          <label className="block font-semibold mt-2">{seat} Score</label>
+          <label className="block font-semibold mt-2">{seat} Color Counts</label>
           <div className="flex gap-4">
             {colors.map((color) => (
               <div key={color}>
@@ -198,11 +224,12 @@ export default function ScoreEntry() {
               </div>
             ))}
           </div>
-          <p className="mt-2">Total: {scores[seat]}</p>
+          <p className="mt-2">Total Value: {totalValues[seat]}</p>
+          <p className="mt-2">Score: {scores[seat]}</p>
         </div>
       ))}
 
-      <p className="text-sm text-gray-400 mb-2">Grand Total: {calculateTotal()}</p>
+      <p className="text-sm text-gray-400 mb-2">Sum of Scores: {sumOfScores}</p>
       {error && <p className="text-red-400">{error}</p>}
       {message && <p className="text-green-400">{message}</p>}
 
