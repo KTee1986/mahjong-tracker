@@ -6,7 +6,7 @@ const navItems = [
   { label: "Score Entry", path: "/score-entry" },
   { label: "Running Total", path: "/running-total" },
   { label: "Chart", path: "/chart" },
-  { label: "Game History", path: "/game-history" },
+  { label: "(GOOD) Game History", path: "/game-history" },
   { label: "Player Insights", path: "/player-insights" },
   { label: "Stats", path: "/stats" },
   { label: "Advanced Stats", path: "/advanced-stats" },
