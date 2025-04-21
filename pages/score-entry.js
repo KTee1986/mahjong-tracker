@@ -98,6 +98,15 @@ export default function ScoreEntry() {
     }
   };
 
+  const isPlayerAvailable = (playerName) => {
+    for (const seat in players) {
+      if (players[seat].includes(playerName)) {
+        return false;
+      }
+    }
+    return true;
+  };
+
   if (isAdmin === null) return null;
 
   return (
@@ -111,15 +120,17 @@ export default function ScoreEntry() {
             <label className="block font-semibold">Player 1:</label>
             <div className="flex flex-wrap gap-2">
               {availablePlayers.map((player) => (
-                <button
-                  key={player.id}
-                  onClick={() => handlePlayerSelect(seat, 0, player.name)}
-                  className={`w-20 p-2 rounded mt-1 mb-1 text-center ${
-                    players[seat][0] === player.name ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300"
-                  }`}
-                >
-                  {player.name}
-                </button>
+                isPlayerAvailable(player.name) || players[seat][0] === player.name ? (
+                  <button
+                    key={player.id}
+                    onClick={() => handlePlayerSelect(seat, 0, player.name)}
+                    className={`w-20 p-2 rounded mt-1 mb-1 text-center ${
+                      players[seat][0] === player.name ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300 text-black"
+                    }`}
+                  >
+                    {player.name}
+                  </button>
+                ) : null
               ))}
             </div>
           </div>
@@ -128,15 +139,17 @@ export default function ScoreEntry() {
             <label className="block font-semibold">Player 2:</label>
             <div className="flex flex-wrap gap-2">
               {availablePlayers.map((player) => (
-                <button
-                  key={player.id}
-                  onClick={() => handlePlayerSelect(seat, 1, player.name)}
-                  className={`w-20 p-2 rounded mt-1 mb-1 text-center ${
-                    players[seat][1] === player.name ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300 text-black"
-                  }`}
-                >
-                  {player.name}
-                </button>
+                isPlayerAvailable(player.name) || players[seat][1] === player.name ? (
+                  <button
+                    key={player.id}
+                    onClick={() => handlePlayerSelect(seat, 1, player.name)}
+                    className={`w-20 p-2 rounded mt-1 mb-1 text-center ${
+                      players[seat][1] === player.name ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300 text-black"
+                    }`}
+                  >
+                    {player.name}
+                  </button>
+                ) : null
               ))}
             </div>
           </div>
