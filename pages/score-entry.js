@@ -39,7 +39,7 @@ export default function ScoreEntry() {
 
   const handlePlayerSelect = (seat, index, playerName) => {
     const newPlayers = { ...players };
-    newPlayers[seat][index] = playerName === players[seat][index] ? "" : playerName; // Toggle selection
+    newPlayers[seat][index] = playerName === players[seat][index] ? "" : playerName;
     setPlayers(newPlayers);
   };
 
@@ -118,15 +118,16 @@ export default function ScoreEntry() {
           <label className="block font-semibold">{seat} Players</label>
           <div>
             <label className="block font-semibold">Player 1:</label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1">
               {availablePlayers.map((player) => (
                 isPlayerAvailable(player.name) || players[seat][0] === player.name ? (
                   <button
                     key={player.id}
                     onClick={() => handlePlayerSelect(seat, 0, player.name)}
-                    className={`w-20 p-2 rounded mt-1 mb-1 text-center ${
-                      players[seat][0] === player.name ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300 text-black"
+                    className={`px-2 py-1 rounded text-xs mt-1 mb-1 text-center whitespace-nowrap ${
+                      players[seat][0] === player.name ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300"
                     }`}
+                    style={{ minWidth: "4ch" }} // Minimum width to prevent collapsing
                   >
                     {player.name}
                   </button>
@@ -137,15 +138,16 @@ export default function ScoreEntry() {
 
           <div>
             <label className="block font-semibold">Player 2:</label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1">
               {availablePlayers.map((player) => (
                 isPlayerAvailable(player.name) || players[seat][1] === player.name ? (
                   <button
                     key={player.id}
                     onClick={() => handlePlayerSelect(seat, 1, player.name)}
-                    className={`w-20 p-2 rounded mt-1 mb-1 text-center ${
-                      players[seat][1] === player.name ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300 text-black"
+                    className={`px-2 py-1 rounded text-xs mt-1 mb-1 text-center whitespace-nowrap ${
+                      players[seat][1] === player.name ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300"
                     }`}
+                    style={{ minWidth: "4ch" }}
                   >
                     {player.name}
                   </button>
