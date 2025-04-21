@@ -15,7 +15,7 @@ export default function ScoreEntry() {
     North: ["", ""],
   });
   const [scores, setScores] = useState({ East: "", South: "", West: "", North: "" });
-  const [availablePlayers, setAvailablePlayers] = useState([]); // Fetch from /api/players
+  const [availablePlayers, setAvailablePlayers] = useState([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -107,22 +107,40 @@ export default function ScoreEntry() {
       {seats.map((seat) => (
         <div key={seat} className="mb-6">
           <label className="block font-semibold">{seat} Players</label>
-          <div className="flex gap-2">
-            {[0, 1].map((i) => (
-              <div key={i}>
+          <div className="flex">
+            <div className="mr-4">
+              <label className="block font-semibold">Player 1:</label>
+              <div className="flex flex-col">
                 {availablePlayers.map((player) => (
                   <button
                     key={player.id}
-                    onClick={() => handlePlayerSelect(seat, i, player.name)}
-                    className={`block w-full p-2 rounded bg-gray-800 text-white mt-1 mb-1 ${
-                      players[seat][i] === player.name ? "bg-blue-600" : "hover:bg-gray-700"
+                    onClick={() => handlePlayerSelect(seat, 0, player.name)}
+                    className={`w-32 p-2 rounded mt-1 mb-1 text-left ${
+                      players[seat][0] === player.name ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300"
                     }`}
                   >
                     {player.name}
                   </button>
                 ))}
               </div>
-            ))}
+            </div>
+
+            <div>
+              <label className="block font-semibold">Player 2:</label>
+              <div className="flex flex-col">
+                {availablePlayers.map((player) => (
+                  <button
+                    key={player.id}
+                    onClick={() => handlePlayerSelect(seat, 1, player.name)}
+                    className={`w-32 p-2 rounded mt-1 mb-1 text-left ${
+                      players[seat][1] === player.name ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300"
+                    }`}
+                  >
+                    {player.name}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           <label className="block font-semibold mt-2">{seat} Score</label>
