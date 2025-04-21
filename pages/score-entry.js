@@ -4,6 +4,8 @@ import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 
 const seats = ["East", "South", "West", "North"];
+const colors = ["Red", "Blue", "Green", "White"];
+const colorValues = { Red: 50, Blue: 25, Green: 10, White: 2 };
 
 export default function ScoreEntry() {
   const router = useRouter();
@@ -14,7 +16,13 @@ export default function ScoreEntry() {
     West: ["", ""],
     North: ["", ""],
   });
-  const [scores, setScores] = useState({ East: "", South: "", West: "", North: "" });
+  const [colorCounts, setColorCounts] = useState({
+    East: { Red: 0, Blue: 0, Green: 0, White: 0 },
+    South: { Red: 0, Blue: 0, Green: 0, White: 0 },
+    West: { Red: 0, Blue: 0, Green: 0, White: 0 },
+    North: { Red: 0, Blue: 0, Green: 0, White: 0 },
+  });
+  const [scores, setScores] = useState({ East: 0, South: 0, West: 0, North: 0 });
   const [availablePlayers, setAvailablePlayers] = useState([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -43,8 +51,19 @@ export default function ScoreEntry() {
     setPlayers(newPlayers);
   };
 
-  const handleScoreInput = (seat, value) => {
-    setScores((prev) => ({ ...prev, [seat]: value }));
+  const handleColorChange = (seat, color, value) => {
+    const newColorCounts = { ...colorCounts };
+    newColorCounts[seat][color] = parseInt(value || 0);
+    setColorCounts(newColorCounts);
+    calculateScore(seat, newColorCounts[seat]);
+  };
+
+  const calculateScore = (seat, counts) => {
+    let total = 0;
+    for (const color in counts) {
+      total += counts[color] * colorValues[color];
+    }
+    setScores((prevScores) => ({ ...prevScores, [seat]: total }));
   };
 
   const calculateTotal = () =>
@@ -60,23 +79,25 @@ export default function ScoreEntry() {
       return;
     }
 
-    const filled = seats.filter((s) => (players[s][0] || players[s][1]) && scores[s] !== "");
+    const filled = seats.filter((s) => (players[s][0] || players[s][1]) && scores[s] !== 0);
     if (filled.length < 2) {
       setError("At least two seats must be filled.");
       return;
     }
 
     const flatPlayers = {};
+    const adjustedScores = {};
     for (let seat of seats) {
       const p = players[seat].filter(Boolean).join(" + ");
       flatPlayers[seat] = p;
+      adjustedScores[seat] = scores[seat] - 200; // Subtract 200 from each score
     }
 
     try {
       const res = await fetch("/api/sheet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ players: flatPlayers, scores }),
+        body: JSON.stringify({ players: flatPlayers, scores: adjustedScores }),
       });
 
       const data = await res.json();
@@ -88,7 +109,13 @@ export default function ScoreEntry() {
           West: ["", ""],
           North: ["", ""],
         });
-        setScores({ East: "", South: "", West: "", North: "" });
+        setColorCounts({
+          East: { Red: 0, Blue: 0, Green: 0, White: 0 },
+          South: { Red: 0, Blue: 0, Green: 0, White: 0 },
+          West: { Red: 0, Blue: 0, Green: 0, White: 0 },
+          North: { Red: 0, Blue: 0, Green: 0, White: 0 },
+        });
+        setScores({ East: 0, South: 0, West: 0, North: 0 });
       } else {
         setError(data.error || "Error submitting game.");
       }
@@ -127,7 +154,7 @@ export default function ScoreEntry() {
                     className={`px-2 py-1 rounded text-xs mt-1 mb-1 text-center whitespace-nowrap ${
                       players[seat][0] === player.name ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300 text-black"
                     }`}
-                    style={{ minWidth: "4ch" }} // Minimum width to prevent collapsing
+                    style={{ minWidth: "4ch" }}
                   >
                     {player.name}
                   </button>
@@ -157,17 +184,25 @@ export default function ScoreEntry() {
           </div>
 
           <label className="block font-semibold mt-2">{seat} Score</label>
-          <input
-            type="number"
-            value={scores[seat]}
-            onChange={(e) => handleScoreInput(seat, e.target.value)}
-            className="w-full p-2 rounded bg-gray-800 text-white mt-1"
-            placeholder="e.g., -5"
-          />
+          <div className="flex gap-4">
+            {colors.map((color) => (
+              <div key={color}>
+                <label className="block">{color}</label>
+                <input
+                  type="number"
+                  value={colorCounts[seat][color] || 0}
+                  onChange={(e) => handleColorChange(seat, color, e.target.value)}
+                  className="w-16 p-2 rounded bg-gray-800 text-white mt-1"
+                  placeholder="0"
+                />
+              </div>
+            ))}
+          </div>
+          <p className="mt-2">Total: {scores[seat]}</p>
         </div>
       ))}
 
-      <p className="text-sm text-gray-400 mb-2">Total: {calculateTotal()}</p>
+      <p className="text-sm text-gray-400 mb-2">Grand Total: {calculateTotal()}</p>
       {error && <p className="text-red-400">{error}</p>}
       {message && <p className="text-green-400">{message}</p>}
 
