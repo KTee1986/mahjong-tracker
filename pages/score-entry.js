@@ -107,39 +107,37 @@ export default function ScoreEntry() {
       {seats.map((seat) => (
         <div key={seat} className="mb-6">
           <label className="block font-semibold">{seat} Players</label>
-          <div className="flex">
-            <div className="mr-4">
-              <label className="block font-semibold">Player 1:</label>
-              <div className="flex flex-col">
-                {availablePlayers.map((player) => (
-                  <button
-                    key={player.id}
-                    onClick={() => handlePlayerSelect(seat, 0, player.name)}
-                    className={`w-32 p-2 rounded mt-1 mb-1 text-left ${
-                      players[seat][0] === player.name ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300"
-                    }`}
-                  >
-                    {player.name}
-                  </button>
-                ))}
-              </div>
+          <div>
+            <label className="block font-semibold">Player 1:</label>
+            <div className="flex flex-wrap gap-2">
+              {availablePlayers.map((player) => (
+                <button
+                  key={player.id}
+                  onClick={() => handlePlayerSelect(seat, 0, player.name)}
+                  className={`w-20 p-2 rounded mt-1 mb-1 text-center ${
+                    players[seat][0] === player.name ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300"
+                  }`}
+                >
+                  {player.name}
+                </button>
+              ))}
             </div>
+          </div>
 
-            <div>
-              <label className="block font-semibold">Player 2:</label>
-              <div className="flex flex-col">
-                {availablePlayers.map((player) => (
-                  <button
-                    key={player.id}
-                    onClick={() => handlePlayerSelect(seat, 1, player.name)}
-                    className={`w-32 p-2 rounded mt-1 mb-1 text-left ${
-                      players[seat][1] === player.name ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300"
-                    }`}
-                  >
-                    {player.name}
-                  </button>
-                ))}
-              </div>
+          <div>
+            <label className="block font-semibold">Player 2:</label>
+            <div className="flex flex-wrap gap-2">
+              {availablePlayers.map((player) => (
+                <button
+                  key={player.id}
+                  onClick={() => handlePlayerSelect(seat, 1, player.name)}
+                  className={`w-20 p-2 rounded mt-1 mb-1 text-center ${
+                    players[seat][1] === player.name ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300 text-black"
+                  }`}
+                >
+                  {player.name}
+                </button>
+              ))}
             </div>
           </div>
 
