@@ -106,7 +106,7 @@ const PlayerList = () => {
       {message && <p className="text-green-400">{message}</p>}
 
       <ul>
-        {players.map((player) => (
+        {Array.isArray(players) && players.map((player) => (
           <li key={player.id} className="flex justify-between items-center py-2 border-b border-gray-700">
             {player.name}
             <button

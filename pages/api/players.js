@@ -13,8 +13,7 @@ const getSheet = async () => {
       ["https://www.googleapis.com/auth/spreadsheets"]
     );
 
-    const client = await auth.getClient();
-    const sheets = google.sheets({ version: "v4", auth: client });
+    const sheets = google.sheets({ version: "v4", auth });
     return sheets;
   } catch (error) {
     console.error("Error getting sheet:", error);
