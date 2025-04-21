@@ -5,7 +5,7 @@ import Layout from "../components/Layout";
 
 const seats = ["East", "South", "West", "North"];
 const colors = ["Red", "Blue", "Green", "White"];
-const colorValues = { Red: 50, Blue: 25, Green: 10, White: 2 };
+const colorValues = { Red: 20, Blue: 10, Green: 2, White: 0.4 };
 
 export default function ScoreEntry() {
   const router = useRouter();
@@ -53,7 +53,7 @@ export default function ScoreEntry() {
 
   const handleColorChange = (seat, color, value) => {
     const newColorCounts = { ...colorCounts };
-    newColorCounts[seat][color] = parseInt(value || 0);
+    newColorCounts[seat][color] = parseFloat(value || 0); // Use parseFloat for decimal
     setColorCounts(newColorCounts);
     calculateScore(seat, newColorCounts[seat]);
   };
@@ -63,23 +63,23 @@ export default function ScoreEntry() {
     for (const color in counts) {
       total += counts[color] * colorValues[color];
     }
-    setScores((prevScores) => ({ ...prevScores, [seat]: total }));
+    setScores((prevScores) => ({ ...prevScores, [seat]: total.toFixed(1) }); // Keep 1 decimal place
   };
 
   const calculateTotal = () =>
-    Object.values(scores).reduce((sum, val) => sum + Number(val || 0), 0);
+    Object.values(scores).reduce((sum, val) => sum + parseFloat(val || 0), 0).toFixed(1); // Keep 1 decimal place
 
   const handleSubmit = async () => {
     setError("");
     setMessage("");
     const total = calculateTotal();
 
-    if (total !== 0) {
+    if (parseFloat(total) !== 0) {
       setError("Scores must sum to 0.");
       return;
     }
 
-    const filled = seats.filter((s) => (players[s][0] || players[s][1]) && scores[s] !== 0);
+    const filled = seats.filter((s) => (players[s][0] || players[s][1]) && parseFloat(scores[s]) !== 0);
     if (filled.length < 2) {
       setError("At least two seats must be filled.");
       return;
@@ -90,7 +90,7 @@ export default function ScoreEntry() {
     for (let seat of seats) {
       const p = players[seat].filter(Boolean).join(" + ");
       flatPlayers[seat] = p;
-      adjustedScores[seat] = scores[seat] - 200; // Subtract 200 from each score
+      adjustedScores[seat] = (parseFloat(scores[seat]) - 200).toFixed(1); // Keep 1 decimal place
     }
 
     try {
@@ -190,7 +190,7 @@ export default function ScoreEntry() {
                 <label className="block">{color}</label>
                 <input
                   type="number"
-                  value={colorCounts[seat][color] || 0}
+                  value={colorCounts[seat][color] !== 0 ? colorCounts[seat][color] : ''}
                   onChange={(e) => handleColorChange(seat, color, e.target.value)}
                   className="w-16 p-2 rounded bg-gray-800 text-white mt-1"
                   placeholder="0"
