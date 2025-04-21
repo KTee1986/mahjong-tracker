@@ -44,7 +44,7 @@ export default function GameHistory() {
             {currentData.map((row, i) => (
               <tr key={i} className="border-t border-gray-700">
                 <td>{row[0]}</td>
-                <td>{formatDate(row[1])</td>
+                <td>{formatDate(row[1])}</td>
                 <td>{row[2]} ({row[3]})</td>
                 <td>{row[4]} ({row[5]})</td>
                 <td>{row[6]} ({row[7]})</td>
