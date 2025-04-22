@@ -191,8 +191,7 @@ export default function ScoreEntry() {
             ))}
           </div>
 
-          <label className="block font-semibold mt-2">{seat} Chip Count</label>
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-4 gap-4 mt-2">
             {colors.map((color) => (
               <div key={color} className="flex flex-col items-center">
                 <label className="mb-1">{color}</label>
