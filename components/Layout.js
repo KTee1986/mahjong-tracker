@@ -3,10 +3,10 @@ import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
 const navItems = [
-  { label: "(GOOD) Score Entry", path: "/score-entry" },
+  { label: "(GOOD)Score Entry", path: "/score-entry" },
   { label: "Running Total", path: "/running-total" },
   { label: "Chart", path: "/chart" },
-  { label: "(GOOD) Game History", path: "/game-history" },
+  { label: "(GOOD)Game History", path: "/game-history" },
   { label: "Player Insights", path: "/player-insights" },
   { label: "Stats", path: "/stats" },
   { label: "Advanced Stats", path: "/advanced-stats" },
