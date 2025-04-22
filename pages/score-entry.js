@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
+import Select from "react-select"; // Import the react-select library
 
 const seats = ["East", "South", "West", "North"];
 const colors = ["Red", "Blue", "Green", "White"];
@@ -11,10 +12,10 @@ export default function ScoreEntry() {
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(null);
   const [players, setPlayers] = useState({
-    East: ["", ""],
-    South: ["", ""],
-    West: ["", ""],
-    North: ["", ""],
+    East: [],
+    South: [],
+    West: [],
+    North: [],
   });
   const [colorCounts, setColorCounts] = useState({
     East: { Red: 0, Blue: 0, Green: 0, White: 0 },
@@ -22,13 +23,7 @@ export default function ScoreEntry() {
     West: { Red: 0, Blue: 0, Green: 0, White: 0 },
     North: { Red: 0, Blue: 0, Green: 0, White: 0 },
   });
-  const [totalValues, setTotalValues] = useState({  // Renamed from scores to totalValues
-    East: 0,
-    South: 0,
-    West: 0,
-    North: 0,
-  });
-  const [scores, setScores] = useState({  // New state for scores (total - 200)
+  const [scores, setScores] = useState({
     East: -200,
     South: -200,
     West: -200,
@@ -37,7 +32,7 @@ export default function ScoreEntry() {
   const [availablePlayers, setAvailablePlayers] = useState([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [sumOfScores, setSumOfScores] = useState(-800); // Initialize to -800 (4 seats * -200)
+  const [sumOfScores, setSumOfScores] = useState(-800);
 
   useEffect(() => {
     const admin = sessionStorage.getItem("admin");
@@ -49,7 +44,9 @@ export default function ScoreEntry() {
     fetch("/api/players")
       .then((res) => res.json())
       .then(({ data }) => {
-        setAvailablePlayers(data);
+        setAvailablePlayers(
+          data.map((player) => ({ value: player.name, label: player.name }))
+        ); // Format for react-select
       })
       .catch((err) => {
         setError("Error fetching players.");
@@ -57,9 +54,9 @@ export default function ScoreEntry() {
       });
   }, []);
 
-  const handlePlayerSelect = (seat, index, playerName) => {
+  const handlePlayerSelect = (seat, selectedOptions) => {
     const newPlayers = { ...players };
-    newPlayers[seat][index] = playerName === players[seat][index] ? "" : playerName;
+    newPlayers[seat] = selectedOptions || []; // Store selected options
     setPlayers(newPlayers);
   };
 
@@ -67,20 +64,22 @@ export default function ScoreEntry() {
     const newColorCounts = { ...colorCounts };
     newColorCounts[seat][color] = parseFloat(value || 0);
     setColorCounts(newColorCounts);
-    calculateValues(seat, newColorCounts[seat]);
+    calculateScore(seat, newColorCounts[seat]);
   };
 
-  const calculateValues = (seat, counts) => {
+  const calculateScore = (seat, counts) => {
     let total = 0;
     for (const color in counts) {
       total += counts[color] * colorValues[color];
     }
-    setTotalValues((prevTotalValues) => ({ ...prevTotalValues, [seat]: parseFloat(total.toFixed(1)) })); // Store total
-    setScores((prevScores) => ({ ...prevScores, [seat]: parseFloat((total - 200).toFixed(1)) })); // Store total - 200
+    setScores((prevScores) => ({ ...prevScores, [seat]: parseFloat(total.toFixed(1)) - 200 }));
   };
 
   useEffect(() => {
-    const newSum = Object.values(scores).reduce((sum, score) => sum + parseFloat(score || 0), 0);
+    const newSum = Object.values(scores).reduce(
+      (sum, score) => sum + parseFloat(score || 0),
+      0
+    );
     setSumOfScores(parseFloat(newSum.toFixed(1)));
   }, [scores]);
 
@@ -88,12 +87,14 @@ export default function ScoreEntry() {
     setError("");
     setMessage("");
 
-    if (parseFloat(sumOfScores.toFixed(1)) !== 0) {  // Validation against sumOfScores
+    if (parseFloat(sumOfScores.toFixed(1)) !== 0) {
       setError("Sum of scores must be 0.");
       return;
     }
 
-    const filled = seats.filter((s) => (players[s][0] || players[s][1]) && parseFloat(totalValues[s]) !== 0);
+    const filled = seats.filter(
+      (s) => players[s].length > 0 && parseFloat(scores[s]) !== -200
+    );
     if (filled.length < 2) {
       setError("At least two seats must be filled.");
       return;
@@ -101,10 +102,9 @@ export default function ScoreEntry() {
 
     const flatPlayers = {};
     const adjustedScores = {};
-    for (let seat of seats) {
-      const p = players[seat].filter(Boolean).join(" + ");
-      flatPlayers[seat] = p;
-      adjustedScores[seat] = parseFloat(scores[seat].toFixed(1)); // Send adjusted scores
+    for (const seat of seats) {
+      flatPlayers[seat] = players[seat].map((p) => p.value).join(" + ");
+      adjustedScores[seat] = parseFloat(scores[seat].toFixed(1));
     }
 
     try {
@@ -118,22 +118,16 @@ export default function ScoreEntry() {
       if (res.ok) {
         setMessage(`Game recorded! ID: ${data.gameId}`);
         setPlayers({
-          East: ["", ""],
-          South: ["", ""],
-          West: ["", ""],
-          North: ["", ""],
+          East: [],
+          South: [],
+          West: [],
+          North: [],
         });
         setColorCounts({
           East: { Red: 0, Blue: 0, Green: 0, White: 0 },
           South: { Red: 0, Blue: 0, Green: 0, White: 0 },
           West: { Red: 0, Blue: 0, Green: 0, White: 0 },
           North: { Red: 0, Blue: 0, Green: 0, White: 0 },
-        });
-        setTotalValues({
-          East: 0,
-          South: 0,
-          West: 0,
-          North: 0,
         });
         setScores({
           East: -200,
@@ -151,15 +145,6 @@ export default function ScoreEntry() {
     }
   };
 
-  const isPlayerAvailable = (playerName) => {
-    for (const seat in players) {
-      if (players[seat].includes(playerName)) {
-        return false;
-      }
-    }
-    return true;
-  };
-
   if (isAdmin === null) return null;
 
   return (
@@ -169,45 +154,66 @@ export default function ScoreEntry() {
       {seats.map((seat) => (
         <div key={seat} className="mb-6">
           <label className="block font-semibold">{seat} Players</label>
-          <div>
-            <label className="block font-semibold">Player 1:</label>
-            <div className="flex flex-wrap gap-1">
-              {availablePlayers.map((player) => (
-                isPlayerAvailable(player.name) || players[seat][0] === player.name ? (
-                  <button
-                    key={player.id}
-                    onClick={() => handlePlayerSelect(seat, 0, player.name)}
-                    className={`px-2 py-1 rounded text-xs mt-1 mb-1 text-center whitespace-nowrap ${
-                      players[seat][0] === player.name ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300 text-black"
-                    }`}
-                    style={{ minWidth: "4ch" }}
-                  >
-                    {player.name}
-                  </button>
-                ) : null
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block font-semibold">Player 2:</label>
-            <div className="flex flex-wrap gap-1">
-              {availablePlayers.map((player) => (
-                isPlayerAvailable(player.name) || players[seat][1] === player.name ? (
-                  <button
-                    key={player.id}
-                    onClick={() => handlePlayerSelect(seat, 1, player.name)}
-                    className={`px-2 py-1 rounded text-xs mt-1 mb-1 text-center whitespace-nowrap ${
-                      players[seat][1] === player.name ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300 text-black"
-                    }`}
-                    style={{ minWidth: "4ch" }}
-                  >
-                    {player.name}
-                  </button>
-                ) : null
-              ))}
-            </div>
-          </div>
+          <Select
+            isMulti
+            options={availablePlayers}
+            value={players[seat]}
+            onChange={(selectedOptions) =>
+              handlePlayerSelect(seat, selectedOptions)
+            }
+            placeholder="Select up to 2 players"
+            maxMenuHeight={150} // Limit the dropdown height
+            styles={{
+              control: (provided) => ({
+                ...provided,
+                backgroundColor: "rgb(31 41 55)", // bg-gray-800 equivalent
+                color: "white",
+                borderColor: "rgb(75 85 99)", // border-gray-500 equivalent
+                borderRadius: "0.375rem", // rounded-md equivalent
+                "&:hover": {
+                  borderColor: "rgb(156 163 175)", // hover:border-gray-300 equivalent
+                },
+              }),
+              menu: (provided) => ({
+                ...provided,
+                backgroundColor: "rgb(31 41 55)",
+                color: "white",
+              }),
+              option: (provided, state) => ({
+                ...provided,
+                color: state.isSelected ? "white" : "white",
+                backgroundColor: state.isSelected ? "rgb(59 130 246)" : "rgb(31 41 55)", // blue-500/gray-800 equivalent
+                "&:hover": {
+                  backgroundColor: state.isSelected ? "rgb(59 130 246)" : "rgb(55 65 81)", // hover:bg-gray-700 equivalent
+                },
+              }),
+              input: (provided) => ({
+                ...provided,
+                color: "white",
+              }),
+              singleValue: (provided) => ({
+                ...provided,
+                color: "white",
+              }),
+              multiValue: (provided) => ({
+                ...provided,
+                backgroundColor: "rgb(59 130 246)", // blue-500 equivalent
+                color: "white",
+                borderRadius: "0.25rem", // rounded-sm equivalent
+              }),
+              multiValueLabel: (provided) => ({
+                ...provided,
+                color: "white",
+              }),
+              multiValueRemove: (provided) => ({
+                ...provided,
+                color: "white",
+                "&:hover": {
+                  backgroundColor: "rgb(94 144 249)", // hover:bg-blue-400 equivalent
+                },
+              }),
+            }}
+          />
 
           <label className="block font-semibold mt-2">{seat} Color Counts</label>
           <div className="flex gap-4">
@@ -216,7 +222,7 @@ export default function ScoreEntry() {
                 <label className="block">{color}</label>
                 <input
                   type="number"
-                  value={colorCounts[seat][color] !== 0 ? colorCounts[seat][color] : ''}
+                  value={colorCounts[seat][color] !== 0 ? colorCounts[seat][color] : ""}
                   onChange={(e) => handleColorChange(seat, color, e.target.value)}
                   className="w-16 p-2 rounded bg-gray-800 text-white mt-1"
                   placeholder="0"
@@ -224,12 +230,15 @@ export default function ScoreEntry() {
               </div>
             ))}
           </div>
-          <p className="mt-2">Total Value: {totalValues[seat]}</p>
-          <p className="mt-2">Score: {scores[seat]}</p>
+          <p className="mt-2">
+            Score: {scores[seat]}
+          </p>
         </div>
       ))}
 
-      <p className="text-sm text-gray-400 mb-2">Sum of Scores: {sumOfScores}</p>
+      <p className="text-sm text-gray-400 mb-2">
+        Sum of Scores: {sumOfScores}
+      </p>
       {error && <p className="text-red-400">{error}</p>}
       {message && <p className="text-green-400">{message}</p>}
 
