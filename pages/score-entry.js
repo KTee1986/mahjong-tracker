@@ -34,6 +34,7 @@ export default function ScoreEntry() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [sumOfScores, setSumOfScores] = useState(-800);
+  const [copySuccess, setCopySuccess] = useState(false); // Track copy success
 
   useEffect(() => {
     const admin = sessionStorage.getItem("admin");
@@ -95,6 +96,7 @@ export default function ScoreEntry() {
   const handleSubmit = async () => {
     setError("");
     setMessage("");
+    setCopySuccess(false); // Reset copy success state
 
     if (parseFloat(sumOfScores.toFixed(1)) !== 0) {
       setError("Sum of scores must be 0.");
@@ -156,11 +158,13 @@ export default function ScoreEntry() {
 
         const copySuccess = () => {
           setMessage(message + " Result copied to clipboard!");
+          setCopySuccess(true);
         };
 
         const copyFailure = (err) => {
           console.error("Could not copy text: ", err);
           setMessage(message + " Could not copy result to clipboard. Please copy manually.");
+          setCopySuccess(false);
         };
 
         const attemptCopy = async () => {
@@ -308,18 +312,16 @@ export default function ScoreEntry() {
         Submit Game
       </button>
 
-      {/* Display result text if copy fails */}
-      {message.includes("copy manually") && (
-        <div className="mt-4 p-4 bg-gray-800 text-white rounded-md">
-          <p className="font-semibold">Results (Copy Manually):</p>
-          <pre className="whitespace-pre-wrap">{seats
-          .map(
-            (seat) =>
-              `${flatPlayers[seat] || "None"} : ${scores[seat]}`
-          )
-          .join("\n")}</pre>
-        </div>
-      )}
+      {/* Display result text always */}
+      <div className="mt-4 p-4 bg-gray-800 text-white rounded-md">
+        <p className="font-semibold">Results:</p>
+        <pre className="whitespace-pre-wrap">{seats
+        .map(
+          (seat) =>
+            `${flatPlayers[seat] || "None"} : ${scores[seat]}`
+        )
+        .join("\n")}</pre>
+      </div>
     </Layout>
   );
 }
