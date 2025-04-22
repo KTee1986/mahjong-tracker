@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 const navItems = [
   { label: "(GOOD)Score Entry", path: "/score-entry" },
-  { label: "Running Total", path: "/running-total" },
+  { label: "(GOOD)Running Total", path: "/running-total" },
   { label: "Chart", path: "/chart" },
   { label: "(GOOD)Game History", path: "/game-history" },
   { label: "Player Insights", path: "/player-insights" },
