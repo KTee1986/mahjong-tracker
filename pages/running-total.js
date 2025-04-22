@@ -14,15 +14,17 @@ export default function RunningTotal() {
         const years = new Set();
 
         data.slice(1).forEach((row) => {
-          const year = row[0].split("-")[0]; // Extract year from date (assuming YYYY-MM-DD format)
+          // Assuming the year is derived from the first column (date)
+          const dateParts = row[0].split("-");
+          const year = dateParts[0]; // Extract the year
           years.add(year);
 
           if (selectedYear === "All" || selectedYear === year) {
             const seatPairs = [
-              [row[2], row[3]], // East
-              [row[4], row[5]], // South
-              [row[6], row[7]], // West
-              [row[8], row[9]], // North
+              [row[2], row[3]],
+              [row[4], row[5]],
+              [row[6], row[7]],
+              [row[8], row[9]],
             ];
 
             seatPairs.forEach(([playersStr, scoreStr]) => {
@@ -59,7 +61,7 @@ export default function RunningTotal() {
           id="year-select"
           value={selectedYear}
           onChange={(e) => setSelectedYear(e.target.value)}
-          className="border rounded py-1 px-2"
+          className="border rounded py-1 px-2 text-black" // Added text-black
         >
           {availableYears.map((year, index) => (
             <option key={index} value={year}>{year}</option>
