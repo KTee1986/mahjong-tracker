@@ -182,17 +182,28 @@ export default function ScoreEntry() {
           </div>
 
           <label className="block font-semibold mt-2">{seat} Color Counts</label>
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
             {colors.map((color) => (
-              <div key={color}>
-                <label className="block">{color}</label>
+              <div key={color} className="flex items-center">
+                <button
+                  onClick={() => handleColorChange(seat, color, colorCounts[seat][color] - 1)}
+                  className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-black"
+                >
+                  -
+                </button>
                 <input
                   type="number"
                   value={colorCounts[seat][color] !== 0 ? colorCounts[seat][color] : ""}
                   onChange={(e) => handleColorChange(seat, color, e.target.value)}
-                  className="w-16 p-2 rounded bg-gray-800 text-white mt-1"
+                  className="w-16 p-2 rounded bg-gray-800 text-white mt-1 mx-2"
                   placeholder="0"
                 />
+                <button
+                  onClick={() => handleColorChange(seat, color, colorCounts[seat][color] + 1)}
+                  className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-black"
+                >
+                  +
+                </button>
               </div>
             ))}
           </div>
