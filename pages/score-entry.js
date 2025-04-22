@@ -150,7 +150,7 @@ export default function ScoreEntry() {
         const resultText = seats
           .map(
             (seat) =>
-              `${flatPlayers[seat] || "None"} : ${adjustedScores[seat]}`
+              `${flatPlayers[seat] || "None"} : ${scores[seat]}` // Use scores[seat] here
           )
           .join("\n");
         navigator.clipboard
