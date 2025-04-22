@@ -34,6 +34,7 @@ export default function ScoreEntry() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [sumOfScores, setSumOfScores] = useState(-800);
+  const [copySuccess, setCopySuccess] = useState(false); // Track copy success
 
   useEffect(() => {
     const admin = sessionStorage.getItem("admin");
@@ -95,6 +96,7 @@ export default function ScoreEntry() {
   const handleSubmit = async () => {
     setError("");
     setMessage("");
+    setCopySuccess(false); // Reset copy success state
 
     if (parseFloat(sumOfScores.toFixed(1)) !== 0) {
       setError("Sum of scores must be 0.");
@@ -150,21 +152,41 @@ export default function ScoreEntry() {
         const resultText = seats
           .map(
             (seat) =>
-              `${flatPlayers[seat] || "None"} : ${scores[seat]}` // Use scores[seat] here
+              `${flatPlayers[seat] || "None"} : ${scores[seat]}`
           )
           .join("\n");
-        navigator.clipboard
-          .writeText(resultText)
-          .then(() => {
-            setMessage(message + " Result copied to clipboard!");
-          })
-          .catch((err) => {
-            console.error("Could not copy text: ", err);
-            setMessage(
-              message +
-                " Could not copy result to clipboard. Please copy manually."
-            );
-          });
+
+        const copySuccess = () => {
+          setMessage(message + " Result copied to clipboard!");
+          setCopySuccess(true);
+        };
+
+        const copyFailure = (err) => {
+          console.error("Could not copy text: ", err);
+          setMessage(message + " Could not copy result to clipboard. Please copy manually.");
+          setCopySuccess(false);
+        };
+
+        if (navigator.clipboard) {
+          navigator.clipboard
+            .writeText(resultText)
+            .then(copySuccess, copyFailure);
+        } else {
+          // Fallback for browsers that don't support navigator.clipboard
+          try {
+            const textArea = document.createElement("textarea");
+            textArea.value = resultText;
+            textArea.style.position = "fixed"; // Avoid scrolling to bottom
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            document.execCommand("copy");
+            document.body.removeChild(textArea);
+            copySuccess();
+          } catch (err) {
+            copyFailure(err);
+          }
+        }
       } else {
         setError(data.error || "Error submitting game.");
       }
@@ -270,6 +292,19 @@ export default function ScoreEntry() {
       >
         Submit Game
       </button>
+
+      {/* Display result text if copy fails */}
+      {!copySuccess && message.includes("copy manually") && (
+        <div className="mt-4 p-4 bg-gray-800 text-white rounded-md">
+          <p className="font-semibold">Results (Copy Manually):</p>
+          <pre className="whitespace-pre-wrap">{seats
+          .map(
+            (seat) =>
+              `${flatPlayers[seat] || "None"} : ${scores[seat]}`
+          )
+          .join("\n")}</pre>
+        </div>
+      )}
     </Layout>
   );
 }
