@@ -7,7 +7,7 @@ const seats = ["East", "South", "West", "North"];
 const colors = ["Red", "Blue", "Green", "White"];
 const colorValues = { Red: 20, Blue: 10, Green: 2, White: 0.4 };
 const MAX_PLAYERS_PER_SEAT = 2;
-const INPUT_WIDTH_CH = 4; // Width of input in "ch" units (max 2 digits)
+const INPUT_WIDTH_CH = 4; // Width for display
 
 export default function ScoreEntry() {
   const router = useRouter();
@@ -67,9 +67,10 @@ export default function ScoreEntry() {
     setPlayers(newPlayers);
   };
 
-  const handleColorChange = (seat, color, value) => {
+  const handleColorChange = (seat, color, change) => {
     const newColorCounts = { ...colorCounts };
-    const newValue = Math.max(0, parseFloat(value || 0)); // Ensure non-negative value
+    const currentValue = newColorCounts[seat][color] || 0;
+    const newValue = Math.max(0, currentValue + change); // Ensure non-negative
     newColorCounts[seat][color] = newValue;
     setColorCounts(newColorCounts);
     calculateScore(seat, newColorCounts[seat]);
@@ -197,22 +198,19 @@ export default function ScoreEntry() {
                 <label className="mb-2">{color}</label>
                 <div className="flex items-center">
                   <button
-                    onClick={() => handleColorChange(seat, color, Math.max(0, colorCounts[seat][color] - 1))} // Ensure non-negative
+                    onClick={() => handleColorChange(seat, color, -1)}
                     className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-black"
                   >
                     -
                   </button>
-                  <input
-                    type="number"
-                    value={colorCounts[seat][color] !== 0 ? colorCounts[seat][color] : ""}
-                    onChange={(e) => handleColorChange(seat, color, e.target.value)}
-                    className="w-8 p-2 rounded bg-gray-800 text-white mt-1 mx-2"
-                    placeholder="0"
+                  <div
+                    className="w-8 p-2 rounded bg-gray-800 text-white mt-1 mx-2 text-center"
                     style={{ width: `${INPUT_WIDTH_CH}ch` }}
-                    min="0" // Ensure non-negative input
-                  />
+                  >
+                    {colorCounts[seat][color] || 0}
+                  </div>
                   <button
-                    onClick={() => handleColorChange(seat, color, colorCounts[seat][color] + 1)}
+                    onClick={() => handleColorChange(seat, color, 1)}
                     className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-black"
                   >
                     +
