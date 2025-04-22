@@ -192,11 +192,11 @@ export default function ScoreEntry() {
           </div>
 
           <label className="block font-semibold mt-2">{seat} Chip Count</label>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-4 gap-4">
             {colors.map((color) => (
               <div key={color} className="flex flex-col items-center">
                 <label className="mb-1">{color}</label>
-                <div className="flex items-center">
+                <div className="flex items-center justify-center">
                   <button
                     onClick={() => handleColorChange(seat, color, -1)}
                     className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-black"
@@ -204,7 +204,7 @@ export default function ScoreEntry() {
                     -
                   </button>
                   <div
-                    className="px-2 py-1 text-center"
+                    className="px-2 py-1 text-center mx-1"
                     style={{ width: `${INPUT_WIDTH_CH}ch` }}
                   >
                     {colorCounts[seat][color] || 0}
