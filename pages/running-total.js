@@ -46,7 +46,8 @@ export default function RunningTotal() {
           .sort((a, b) => b.total - a.total);
 
         setPlayers(result);
-        setAvailableYears(["All", ...Array.from(years).sort()]);
+        // Sort years in descending order
+        setAvailableYears(["All", ...Array.from(years).sort((a, b) => parseInt(b) - parseInt(a))]);
       });
   }, [selectedYear]);
 
