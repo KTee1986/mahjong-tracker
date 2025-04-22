@@ -34,7 +34,6 @@ export default function ScoreEntry() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [sumOfScores, setSumOfScores] = useState(-800);
-  const [copySuccess, setCopySuccess] = useState(false); // Track copy success
 
   useEffect(() => {
     const admin = sessionStorage.getItem("admin");
@@ -96,7 +95,6 @@ export default function ScoreEntry() {
   const handleSubmit = async () => {
     setError("");
     setMessage("");
-    setCopySuccess(false); // Reset copy success state
 
     if (parseFloat(sumOfScores.toFixed(1)) !== 0) {
       setError("Sum of scores must be 0.");
@@ -106,106 +104,35 @@ export default function ScoreEntry() {
     const filled = seats.filter(
       (s) => players[s].length > 0 && parseFloat(scores[s]) !== -200
     );
-    if (filled.length !== seats.length) {
-      setError("All seats must be filled.");
+    if (filled.length < 2) {
+      setError("At least two seats must be filled.");
       return;
     }
 
     const flatPlayers = {};
     const adjustedScores = {};
-    for (const seat of seats) {
-      flatPlayers[seat] = players[seat].join(" + ");
-      adjustedScores[seat] = parseFloat(scores[seat].toFixed(1));
+    for (let seat of seats) {
+      const p = players[seat].filter(Boolean).join(" + ");
+      flatPlayers[seat] = p;
     }
 
     try {
       const res = await fetch("/api/sheet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ players: flatPlayers, scores: adjustedScores }),
+        body: JSON.stringify({ players: flatPlayers, scores }),
       });
 
       const data = await res.json();
       if (res.ok) {
         setMessage(`Game recorded! ID: ${data.gameId}`);
         setPlayers({
-          East: [],
-          South: [],
-          West: [],
-          North: [],
+          East: ["", ""],
+          South: ["", ""],
+          West: ["", ""],
+          North: ["", ""],
         });
-        setColorCounts({
-          East: { Red: 0, Blue: 0, Green: 0, White: 0 },
-          South: { Red: 0, Blue: 0, Green: 0, White: 0 },
-          West: { Red: 0, Blue: 0, Green: 0, White: 0 },
-          North: { Red: 0, Blue: 0, Green: 0, White: 0 },
-        });
-        setScores({
-          East: -200,
-          South: -200,
-          West: -200,
-          North: -200,
-        });
-        setSumOfScores(-800);
-
-        // Copy result to clipboard
-        const resultText = seats
-          .map(
-            (seat) =>
-              `${flatPlayers[seat] || "None"} : ${scores[seat]}`
-          )
-          .join("\n");
-
-        const copySuccess = () => {
-          setMessage(message + " Result copied to clipboard!");
-          setCopySuccess(true);
-        };
-
-        const copyFailure = (err) => {
-          console.error("Could not copy text: ", err);
-          setMessage(message + " Could not copy result to clipboard. Please copy manually.");
-          setCopySuccess(false);
-        };
-
-        const attemptCopy = async () => {
-          if (navigator.clipboard) {
-            try {
-              await navigator.clipboard.writeText(resultText);
-              copySuccess();
-              return; // Exit if successful
-            } catch (err) {
-              console.error("Clipboard write failed:", err);
-              // Fallback will be triggered below
-            }
-          }
-
-          // Fallback for browsers that don't support navigator.clipboard or fail
-          try {
-            const textArea = document.createElement("textarea");
-            textArea.value = resultText;
-            textArea.style.position = "fixed"; // Avoid scrolling to bottom
-            textArea.style.top = "0";
-            textArea.style.left = "0";
-            textArea.style.width = "2em";
-            textArea.style.height = "2em";
-            textArea.style.padding = "0";
-            textArea.style.border = "none";
-            textArea.style.outline = "none";
-            textArea.style.boxShadow = "none";
-            textArea.style.background = "transparent";
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand("copy");
-            document.body.removeChild(textArea);
-            copySuccess();
-          } catch (err) {
-            console.error("Fallback copy failed:", err);
-            copyFailure(err);
-          }
-        };
-
-        attemptCopy(); // Call the unified copy function
-
+        setScores({ East: "", South: "", West: "", North: "" });
       } else {
         setError(data.error || "Error submitting game.");
       }
@@ -213,30 +140,6 @@ export default function ScoreEntry() {
       setError("Failed to submit. Check console for details.");
       console.error(err);
     }
-  };
-
-  const isPlayerAvailable = (seat, playerName) => {
-    for (const otherSeat in players) {
-      if (otherSeat !== seat && players[otherSeat].includes(playerName)) {
-        return false;
-      }
-    }
-    return true;
-  };
-
-  const areAllSeatsFilled = () => {
-    return seats.every(seat => players[seat].length > 0);
-  };
-
-  const getAvailablePlayers = (currentSeat) => {
-    return availablePlayers.filter(player => {
-      for (const seat in players) {
-        if (seat !== currentSeat && players[seat].includes(player.name)) {
-          return false;
-        }
-      }
-      return true;
-    });
   };
 
   if (isAdmin === null) return null;
@@ -248,80 +151,46 @@ export default function ScoreEntry() {
       {seats.map((seat) => (
         <div key={seat} className="mb-6">
           <label className="block font-semibold">{seat} Players</label>
-          <div className="flex flex-wrap gap-2">
-            {getAvailablePlayers(seat).map((player) => (
-              <button
-                key={player.id}
-                onClick={() => handlePlayerSelect(seat, player.name)}
-                className={`px-2 py-1 rounded text-xs mt-1 mb-1 text-center whitespace-nowrap ${
-                  players[seat].includes(player.name)
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-200 hover:bg-gray-300 text-black"
-                }`}
-                style={{ minWidth: "4ch" }}
-              >
-                {player.name}
-              </button>
+          <div className="flex gap-2">
+            {[0, 1].map((i) => (
+              <input
+                key={i}
+                type="text"
+                value={players[seat][i]}
+                onChange={(e) => handleInput(seat, i, e.target.value)}
+                className="w-full p-2 rounded bg-gray-800 text-white mt-1"
+                placeholder={`Player ${i + 1}`}
+                list={`autocomplete-${seat}-${i}`}
+              />
             ))}
           </div>
+          <datalist id={`autocomplete-${seat}-0`}>
+            {Array.isArray(suggestions) && suggestions.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
 
-          <div className="grid grid-cols-4 gap-4 mt-2">
-            {colors.map((color) => (
-              <div key={color} className="flex flex-col items-center">
-                <label className="mb-1">{color}</label>
-                <div className="flex items-center justify-center">
-                  <button
-                    onClick={() => handleColorChange(seat, color, -1)}
-                    className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-black"
-                  >
-                    -
-                  </button>
-                  <div
-                    className="px-2 py-1 text-center mx-1"
-                    style={{ width: `${INPUT_WIDTH_CH}ch` }}
-                  >
-                    {colorCounts[seat][color] || 0}
-                  </div>
-                  <button
-                    onClick={() => handleColorChange(seat, color, 1)}
-                    className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-black"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-          <p className="mt-2">
-            Score: {scores[seat]}
-          </p>
+          <label className="block font-semibold mt-2">{seat} Score</label>
+          <input
+            type="number"
+            value={scores[seat]}
+            onChange={(e) => handleScoreInput(seat, e.target.value)}
+            className="w-full p-2 rounded bg-gray-800 text-white mt-1"
+            placeholder="e.g., -5"
+          />
         </div>
       ))}
 
-      <p className="text-sm text-gray-400 mb-2">
-        Sum of Scores: {sumOfScores}
-      </p>
+      <p className="text-sm text-gray-400 mb-2">Total: {calculateTotal()}</p>
       {error && <p className="text-red-400">{error}</p>}
       {message && <p className="text-green-400">{message}</p>}
 
       <button
         onClick={handleSubmit}
-        className={`bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white mt-4 ${areAllSeatsFilled() ? "" : "opacity-50 cursor-not-allowed"}`}
-        disabled={!areAllSeatsFilled()}
+        className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white mt-4"
       >
         Submit Game
       </button>
-
-      {/* Display result text always */}
-      <div className="mt-4 p-4 bg-gray-800 text-white rounded-md">
-        <p className="font-semibold">Results:</p>
-        <pre className="whitespace-pre-wrap">{seats
-        .map(
-          (seat) =>
-            `${flatPlayers[seat] || "None"} : ${scores[seat]}`
-        )
-        .join("\n")}</pre>
-      </div>
     </Layout>
   );
 }
