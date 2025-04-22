@@ -104,8 +104,8 @@ export default function ScoreEntry() {
     const filled = seats.filter(
       (s) => players[s].length > 0 && parseFloat(scores[s]) !== -200
     );
-    if (filled.length < 2) {
-      setError("At least two seats must be filled.");
+    if (filled.length !== seats.length) {
+      setError("All seats must be filled.");
       return;
     }
 
