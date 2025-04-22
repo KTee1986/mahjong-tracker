@@ -205,9 +205,8 @@ export default function ScoreEntry() {
                   players[seat].includes(player.name)
                     ? "bg-blue-600 text-white"
                     : "bg-gray-200 hover:bg-gray-300 text-black"
-                } ${players[seat].length >= MAX_PLAYERS_PER_SEAT && !players[seat].includes(player.name) ? "opacity-50 cursor-not-allowed" : ""}`}
+                }`}
                 style={{ minWidth: "4ch" }}
-                disabled={players[seat].length >= MAX_PLAYERS_PER_SEAT && !players[seat].includes(player.name)}
               >
                 {player.name}
               </button>
