@@ -2,11 +2,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
-import Select from "react-select"; // Import the react-select library
 
 const seats = ["East", "South", "West", "North"];
 const colors = ["Red", "Blue", "Green", "White"];
 const colorValues = { Red: 20, Blue: 10, Green: 2, White: 0.4 };
+const MAX_PLAYERS_PER_SEAT = 2;
 
 export default function ScoreEntry() {
   const router = useRouter();
@@ -44,9 +44,7 @@ export default function ScoreEntry() {
     fetch("/api/players")
       .then((res) => res.json())
       .then(({ data }) => {
-        setAvailablePlayers(
-          data.map((player) => ({ value: player.name, label: player.name }))
-        ); // Format for react-select
+        setAvailablePlayers(data);
       })
       .catch((err) => {
         setError("Error fetching players.");
@@ -54,9 +52,17 @@ export default function ScoreEntry() {
       });
   }, []);
 
-  const handlePlayerSelect = (seat, selectedOptions) => {
+  const handlePlayerSelect = (seat, playerName) => {
     const newPlayers = { ...players };
-    newPlayers[seat] = selectedOptions || []; // Store selected options
+    const seatPlayers = newPlayers[seat];
+
+    if (seatPlayers.includes(playerName)) {
+      // Deselect player
+      newPlayers[seat] = seatPlayers.filter((p) => p !== playerName);
+    } else if (seatPlayers.length < MAX_PLAYERS_PER_SEAT) {
+      // Select player if not full
+      newPlayers[seat] = [...seatPlayers, playerName];
+    }
     setPlayers(newPlayers);
   };
 
@@ -103,7 +109,7 @@ export default function ScoreEntry() {
     const flatPlayers = {};
     const adjustedScores = {};
     for (const seat of seats) {
-      flatPlayers[seat] = players[seat].map((p) => p.value).join(" + ");
+      flatPlayers[seat] = players[seat].join(" + ");
       adjustedScores[seat] = parseFloat(scores[seat].toFixed(1));
     }
 
@@ -145,6 +151,10 @@ export default function ScoreEntry() {
     }
   };
 
+  const isPlayerSelected = (seat, playerName) => {
+    return players[seat].includes(playerName);
+  };
+
   if (isAdmin === null) return null;
 
   return (
@@ -154,66 +164,22 @@ export default function ScoreEntry() {
       {seats.map((seat) => (
         <div key={seat} className="mb-6">
           <label className="block font-semibold">{seat} Players</label>
-          <Select
-            isMulti
-            options={availablePlayers}
-            value={players[seat]}
-            onChange={(selectedOptions) =>
-              handlePlayerSelect(seat, selectedOptions)
-            }
-            placeholder="Select up to 2 players"
-            maxMenuHeight={150} // Limit the dropdown height
-            styles={{
-              control: (provided) => ({
-                ...provided,
-                backgroundColor: "rgb(31 41 55)", // bg-gray-800 equivalent
-                color: "white",
-                borderColor: "rgb(75 85 99)", // border-gray-500 equivalent
-                borderRadius: "0.375rem", // rounded-md equivalent
-                "&:hover": {
-                  borderColor: "rgb(156 163 175)", // hover:border-gray-300 equivalent
-                },
-              }),
-              menu: (provided) => ({
-                ...provided,
-                backgroundColor: "rgb(31 41 55)",
-                color: "white",
-              }),
-              option: (provided, state) => ({
-                ...provided,
-                color: state.isSelected ? "white" : "white",
-                backgroundColor: state.isSelected ? "rgb(59 130 246)" : "rgb(31 41 55)", // blue-500/gray-800 equivalent
-                "&:hover": {
-                  backgroundColor: state.isSelected ? "rgb(59 130 246)" : "rgb(55 65 81)", // hover:bg-gray-700 equivalent
-                },
-              }),
-              input: (provided) => ({
-                ...provided,
-                color: "white",
-              }),
-              singleValue: (provided) => ({
-                ...provided,
-                color: "white",
-              }),
-              multiValue: (provided) => ({
-                ...provided,
-                backgroundColor: "rgb(59 130 246)", // blue-500 equivalent
-                color: "white",
-                borderRadius: "0.25rem", // rounded-sm equivalent
-              }),
-              multiValueLabel: (provided) => ({
-                ...provided,
-                color: "white",
-              }),
-              multiValueRemove: (provided) => ({
-                ...provided,
-                color: "white",
-                "&:hover": {
-                  backgroundColor: "rgb(94 144 249)", // hover:bg-blue-400 equivalent
-                },
-              }),
-            }}
-          />
+          <div className="flex flex-wrap gap-2">
+            {availablePlayers.map((player) => (
+              <button
+                key={player.id}
+                onClick={() => handlePlayerSelect(seat, player.name)}
+                className={`px-2 py-1 rounded text-xs mt-1 mb-1 text-center whitespace-nowrap ${
+                  isPlayerSelected(seat, player.name)
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-200 hover:bg-gray-300 text-black"
+                }`}
+                style={{ minWidth: "4ch" }}
+              >
+                {player.name}
+              </button>
+            ))}
+          </div>
 
           <label className="block font-semibold mt-2">{seat} Color Counts</label>
           <div className="flex gap-4">
