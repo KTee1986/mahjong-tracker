@@ -4,36 +4,21 @@ import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 
 const seats = ["East", "South", "West", "North"];
-const colors = ["Red", "Blue", "Green", "White"];
-const colorValues = { Red: 20, Blue: 10, Green: 2, White: 0.4 };
-const MAX_PLAYERS_PER_SEAT = 2;
-const INPUT_WIDTH_CH = 3; // Adjusted width for display
 
-export default function ScoreEntry() {
+export default function ScoreEntry() {  // ✅ Correct export
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(null);
   const [players, setPlayers] = useState({
-    East: [],
-    South: [],
-    West: [],
-    North: [],
+    East: ["", ""],
+    South: ["", ""],
+    West: ["", ""],
+    North: ["", ""],
   });
-  const [colorCounts, setColorCounts] = useState({
-    East: { Red: 0, Blue: 0, Green: 0, White: 0 },
-    South: { Red: 0, Blue: 0, Green: 0, White: 0 },
-    West: { Red: 0, Blue: 0, Green: 0, White: 0 },
-    North: { Red: 0, Blue: 0, Green: 0, White: 0 },
-  });
-  const [scores, setScores] = useState({
-    East: -200,
-    South: -200,
-    West: -200,
-    North: -200,
-  });
-  const [availablePlayers, setAvailablePlayers] = useState([]);
+  const [scores, setScores] = useState({ East: "", South: "", West: "", North: "" });
+  const [suggestions, setSuggestions] = useState([]);
+  const [allNames, setAllNames] = useState([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [sumOfScores, setSumOfScores] = useState(-800);
 
   useEffect(() => {
     const admin = sessionStorage.getItem("admin");
@@ -42,10 +27,10 @@ export default function ScoreEntry() {
   }, [router]);
 
   useEffect(() => {
-    fetch("/api/players")
+    fetch("/api/players")  // Fetch from the correct API endpoint
       .then((res) => res.json())
       .then(({ data }) => {
-        setAvailablePlayers(data);
+        setAllNames(data.map(player => player.name)); // Extract names
       })
       .catch((err) => {
         setError("Error fetching players.");
@@ -53,64 +38,41 @@ export default function ScoreEntry() {
       });
   }, []);
 
-  const handlePlayerSelect = (seat, playerName) => {
+  const handleInput = (seat, index, value) => {
     const newPlayers = { ...players };
-    const seatPlayers = newPlayers[seat];
-
-    if (seatPlayers.includes(playerName)) {
-      // Deselect player
-      newPlayers[seat] = seatPlayers.filter((p) => p !== playerName);
-    } else if (seatPlayers.length < MAX_PLAYERS_PER_SEAT) {
-      // Select player if not full
-      newPlayers[seat] = [...seatPlayers, playerName];
-    }
+    newPlayers[seat][index] = value;
     setPlayers(newPlayers);
-  };
-
-  const handleColorChange = (seat, color, change) => {
-    const newColorCounts = { ...colorCounts };
-    const currentValue = newColorCounts[seat][color] || 0;
-    const newValue = Math.max(0, currentValue + change); // Ensure non-negative
-    newColorCounts[seat][color] = newValue;
-    setColorCounts(newColorCounts);
-    calculateScore(seat, newColorCounts[seat]);
-  };
-
-  const calculateScore = (seat, counts) => {
-    let total = 0;
-    for (const color in counts) {
-      total += counts[color] * colorValues[color];
+    if (value.length > 0) {
+      setSuggestions(allNames.filter((n) => n.toLowerCase().startsWith(value.toLowerCase())));
+    } else {
+      setSuggestions([]);
     }
-    setScores((prevScores) => ({ ...prevScores, [seat]: parseFloat(total.toFixed(1)) - 200 }));
   };
 
-  useEffect(() => {
-    const newSum = Object.values(scores).reduce(
-      (sum, score) => sum + parseFloat(score || 0),
-      0
-    );
-    setSumOfScores(parseFloat(newSum.toFixed(1)));
-  }, [scores]);
+  const handleScoreInput = (seat, value) => {
+    setScores((prev) => ({ ...prev, [seat]: value }));
+  };
+
+  const calculateTotal = () =>
+    Object.values(scores).reduce((sum, val) => sum + Number(val || 0), 0);
 
   const handleSubmit = async () => {
     setError("");
     setMessage("");
+    const total = calculateTotal();
 
-    if (parseFloat(sumOfScores.toFixed(1)) !== 0) {
-      setError("Sum of scores must be 0.");
+    if (total !== 0) {
+      setError("Scores must sum to 0.");
       return;
     }
 
-    const filled = seats.filter(
-      (s) => players[s].length > 0 && parseFloat(scores[s]) !== -200
-    );
+    const filled = seats.filter((s) => (players[s][0] || players[s][1]) && scores[s] !== "");
     if (filled.length < 2) {
       setError("At least two seats must be filled.");
       return;
     }
 
     const flatPlayers = {};
-    const adjustedScores = {};
     for (let seat of seats) {
       const p = players[seat].filter(Boolean).join(" + ");
       flatPlayers[seat] = p;
