@@ -50,14 +50,16 @@ export default function Stats() {
           }
         });
 
-        const table = Object.values(stats).map(s => ({
-          player: s.player,
-          games: s.totalGames,
-          winRate: ((s.positiveGames / s.totalGames) * 100).toFixed(1) + '%',
-          average: (s.totalScore / s.totalGames).toFixed(2),
-          highest: s.highest.toFixed(2),
-          lowest: s.lowest.toFixed(2),
-        }));
+        const table = Object.values(stats)
+          .map(s => ({
+            player: s.player,
+            games: s.totalGames,
+            winRate: ((s.positiveGames / s.totalGames) * 100).toFixed(1) + '%',
+            average: (s.totalScore / s.totalGames).toFixed(2),
+            highest: s.highest.toFixed(2),
+            lowest: s.lowest.toFixed(2),
+          }))
+          .sort((a, b) => parseFloat(b.winRate) - parseFloat(a.winRate)); // Sort by winRate
 
         setRows(table);
         setAvailableYears(["All", ...Array.from(years).sort((a, b) => parseInt(b) - parseInt(a))]);
