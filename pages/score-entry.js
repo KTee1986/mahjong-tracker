@@ -7,6 +7,7 @@ const seats = ["East", "South", "West", "North"];
 const colors = ["Red", "Blue", "Green", "White"];
 const colorValues = { Red: 20, Blue: 10, Green: 2, White: 0.4 };
 const MAX_PLAYERS_PER_SEAT = 2;
+const INPUT_WIDTH_CH = 4; // Width of input in "ch" units (max 2 digits)
 
 export default function ScoreEntry() {
   const router = useRouter();
@@ -151,8 +152,13 @@ export default function ScoreEntry() {
     }
   };
 
-  const isPlayerSelected = (seat, playerName) => {
-    return players[seat].includes(playerName);
+  const isPlayerAvailable = (seat, playerName) => {
+    for (const otherSeat in players) {
+      if (otherSeat !== seat && players[otherSeat].includes(playerName)) {
+        return false;
+      }
+    }
+    return true;
   };
 
   if (isAdmin === null) return null;
@@ -166,25 +172,28 @@ export default function ScoreEntry() {
           <label className="block font-semibold">{seat} Players</label>
           <div className="flex flex-wrap gap-2">
             {availablePlayers.map((player) => (
-              <button
-                key={player.id}
-                onClick={() => handlePlayerSelect(seat, player.name)}
-                className={`px-2 py-1 rounded text-xs mt-1 mb-1 text-center whitespace-nowrap ${
-                  isPlayerSelected(seat, player.name)
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-200 hover:bg-gray-300 text-black"
-                }`}
-                style={{ minWidth: "4ch" }}
-              >
-                {player.name}
-              </button>
+              isPlayerAvailable(seat, player.name) ? (
+                <button
+                  key={player.id}
+                  onClick={() => handlePlayerSelect(seat, player.name)}
+                  className={`px-2 py-1 rounded text-xs mt-1 mb-1 text-center whitespace-nowrap ${
+                    players[seat].includes(player.name)
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-200 hover:bg-gray-300 text-black"
+                  }`}
+                  style={{ minWidth: "4ch" }}
+                >
+                  {player.name}
+                </button>
+              ) : null
             ))}
           </div>
 
-          <label className="block font-semibold mt-2">{seat} Color Counts</label>
-          <div className="flex gap-4 items-center">
+          <label className="block font-semibold mt-2">{seat} Chip Count</label>
+          <div className="grid grid-cols-4 gap-2">
             {colors.map((color) => (
               <div key={color} className="flex items-center">
+                <label className="mr-2">{color}:</label>
                 <button
                   onClick={() => handleColorChange(seat, color, colorCounts[seat][color] - 1)}
                   className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-black"
@@ -195,8 +204,9 @@ export default function ScoreEntry() {
                   type="number"
                   value={colorCounts[seat][color] !== 0 ? colorCounts[seat][color] : ""}
                   onChange={(e) => handleColorChange(seat, color, e.target.value)}
-                  className="w-16 p-2 rounded bg-gray-800 text-white mt-1 mx-2"
+                  className="w-8 p-2 rounded bg-gray-800 text-white mt-1 mx-2"
                   placeholder="0"
+                  style={{ width: `${INPUT_WIDTH_CH}ch` }}
                 />
                 <button
                   onClick={() => handleColorChange(seat, color, colorCounts[seat][color] + 1)}
