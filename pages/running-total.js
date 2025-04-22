@@ -37,9 +37,9 @@ export default function RunningTotal() {
                 if (!scores[name]) scores[name] = 0;
                 scores[name] += portion;
               });
-            }
-          });
-        }
+            });
+          }
+        });
 
         const result = Object.entries(scores)
           .map(([name, total]) => ({ name, total: total.toFixed(2) }))
