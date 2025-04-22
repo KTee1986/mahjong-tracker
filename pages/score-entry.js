@@ -187,6 +187,17 @@ export default function ScoreEntry() {
     return seats.every(seat => players[seat].length > 0);
   };
 
+  const getAvailablePlayers = (currentSeat) => {
+    return availablePlayers.filter(player => {
+      for (const seat in players) {
+        if (seat !== currentSeat && players[seat].includes(player.name)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  };
+
   if (isAdmin === null) return null;
 
   return (
@@ -197,7 +208,7 @@ export default function ScoreEntry() {
         <div key={seat} className="mb-6">
           <label className="block font-semibold">{seat} Players</label>
           <div className="flex flex-wrap gap-2">
-            {availablePlayers.map((player) => (
+            {getAvailablePlayers(seat).map((player) => (
               <button
                 key={player.id}
                 onClick={() => handlePlayerSelect(seat, player.name)}
