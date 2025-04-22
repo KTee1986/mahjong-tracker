@@ -7,7 +7,7 @@ const seats = ["East", "South", "West", "North"];
 const colors = ["Red", "Blue", "Green", "White"];
 const colorValues = { Red: 20, Blue: 10, Green: 2, White: 0.4 };
 const MAX_PLAYERS_PER_SEAT = 2;
-const INPUT_WIDTH_CH = 4; // Width for display
+const INPUT_WIDTH_CH = 3; // Adjusted width for display
 
 export default function ScoreEntry() {
   const router = useRouter();
@@ -195,7 +195,7 @@ export default function ScoreEntry() {
           <div className="grid grid-cols-4 gap-2">
             {colors.map((color) => (
               <div key={color} className="flex flex-col items-center">
-                <label className="mb-2">{color}</label>
+                <label className="mb-1">{color}</label>
                 <div className="flex items-center">
                   <button
                     onClick={() => handleColorChange(seat, color, -1)}
@@ -204,7 +204,7 @@ export default function ScoreEntry() {
                     -
                   </button>
                   <div
-                    className="w-8 p-2 rounded bg-gray-800 text-white mt-1 mx-2 text-center"
+                    className="px-2 py-1 text-center"
                     style={{ width: `${INPUT_WIDTH_CH}ch` }}
                   >
                     {colorCounts[seat][color] || 0}
