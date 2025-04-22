@@ -14,9 +14,9 @@ export default function RunningTotal() {
         const years = new Set();
 
         data.slice(1).forEach((row) => {
-          // Assuming the year is derived from the first column (date)
-          const dateParts = row[0].split("-");
-          const year = dateParts[0]; // Extract the year
+          // Extract year from the timestamp (2nd column, index 1)
+          const timestamp = row[1];
+          const year = timestamp.substring(0, 4); // Assuming YYYY-MM-DDTHH:mm:ss.sssZ format
           years.add(year);
 
           if (selectedYear === "All" || selectedYear === year) {
@@ -37,9 +37,9 @@ export default function RunningTotal() {
                 if (!scores[name]) scores[name] = 0;
                 scores[name] += portion;
               });
-            });
-          }
-        });
+            }
+          });
+        }
 
         const result = Object.entries(scores)
           .map(([name, total]) => ({ name, total: total.toFixed(2) }))
@@ -61,7 +61,7 @@ export default function RunningTotal() {
           id="year-select"
           value={selectedYear}
           onChange={(e) => setSelectedYear(e.target.value)}
-          className="border rounded py-1 px-2 text-black" // Added text-black
+          className="border rounded py-1 px-2 text-black"
         >
           {availableYears.map((year, index) => (
             <option key={index} value={year}>{year}</option>
