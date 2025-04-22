@@ -34,7 +34,6 @@ export default function ScoreEntry() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [sumOfScores, setSumOfScores] = useState(-800);
-  const [gameSubmitted, setGameSubmitted] = useState(false); // New state
 
   useEffect(() => {
     const admin = sessionStorage.getItem("admin");
@@ -127,7 +126,6 @@ export default function ScoreEntry() {
       const data = await res.json();
       if (res.ok) {
         setMessage(`Game recorded! ID: ${data.gameId}`);
-        setGameSubmitted(true); // Set gameSubmitted to true
         setPlayers({
           East: [],
           South: [],
@@ -206,86 +204,80 @@ export default function ScoreEntry() {
     <Layout>
       <h1 className="text-xl font-bold mb-4">Score Entry</h1>
 
-      {gameSubmitted ? (
-        <div>
-          <p className="text-green-500 mb-4">{message}</p>
-          <h2 className="text-lg font-semibold mb-2">Game Results:</h2>
-          {seats.map((seat) => (
-            <p key={seat} className="mb-1">
-              {players[seat].join(" + ") || "None"}: {scores[seat]}
-            </p>
-          ))}
-        </div>
-      ) : (
-        <div>
-          {seats.map((seat) => (
-            <div key={seat} className="mb-6">
-              <label className="block font-semibold">{seat} Players</label>
-              <div className="flex flex-wrap gap-2">
-                {getAvailablePlayers(seat).map((player) => (
+      {seats.map((seat) => (
+        <div key={seat} className="mb-6">
+          <label className="block font-semibold">{seat} Players</label>
+          <div className="flex flex-wrap gap-2">
+            {getAvailablePlayers(seat).map((player) => (
+              <button
+                key={player.id}
+                onClick={() => handlePlayerSelect(seat, player.name)}
+                className={`px-2 py-1 rounded text-xs mt-1 mb-1 text-center whitespace-nowrap ${
+                  players[seat].includes(player.name)
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-200 hover:bg-gray-300 text-black"
+                }`}
+                style={{ minWidth: "4ch" }}
+              >
+                {player.name}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-4 gap-4 mt-2">
+            {colors.map((color) => (
+              <div key={color} className="flex flex-col items-center">
+                <label className="mb-1">{color}</label>
+                <div className="flex items-center justify-center">
                   <button
-                    key={player.id}
-                    onClick={() => handlePlayerSelect(seat, player.name)}
-                    className={`px-2 py-1 rounded text-xs mt-1 mb-1 text-center whitespace-nowrap ${
-                      players[seat].includes(player.name)
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-200 hover:bg-gray-300 text-black"
-                    }`}
-                    style={{ minWidth: "4ch" }}
+                    onClick={() => handleColorChange(seat, color, -1)}
+                    className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-black"
                   >
-                    {player.name}
+                    -
                   </button>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-4 gap-4 mt-2">
-                {colors.map((color) => (
-                  <div key={color} className="flex flex-col items-center">
-                    <label className="mb-1">{color}</label>
-                    <div className="flex items-center justify-center">
-                      <button
-                        onClick={() => handleColorChange(seat, color, -1)}
-                        className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-black"
-                      >
-                        -
-                      </button>
-                      <div
-                        className="px-2 py-1 text-center mx-1"
-                        style={{ width: `${INPUT_WIDTH_CH}ch` }}
-                      >
-                        {colorCounts[seat][color] || 0}
-                      </div>
-                      <button
-                        onClick={() => handleColorChange(seat, color, 1)}
-                        className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-black"
-                      >
-                        +
-                      </button>
-                    </div>
+                  <div
+                    className="px-2 py-1 text-center mx-1"
+                    style={{ width: `${INPUT_WIDTH_CH}ch` }}
+                  >
+                    {colorCounts[seat][color] || 0}
                   </div>
-                ))}
+                  <button
+                    onClick={() => handleColorChange(seat, color, 1)}
+                    className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-black"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
-              <p className="mt-2">
-                Score: {scores[seat]}
-              </p>
-            </div>
-          ))}
-
-          <p className="text-sm text-gray-400 mb-2">
-            Sum of Scores: {sumOfScores}
+            ))}
+          </div>
+          <p className="mt-2">
+            Score: {scores[seat]}
           </p>
-          {error && <p className="text-red-400">{error}</p>}
-          {message && <p className="text-green-400">{message}</p>}
-
-          <button
-            onClick={handleSubmit}
-            className={`bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white mt-4 ${areAllSeatsFilled() ? "" : "opacity-50 cursor-not-allowed"}`}
-            disabled={!areAllSeatsFilled()}
-          >
-            Submit Game
-          </button>
         </div>
-      )}
+      ))}
+
+      <p className="text-sm text-gray-400 mb-2">
+        Sum of Scores: {sumOfScores}
+      </p>
+      <div className="mt-4"> {/* Container for results */}
+        <h2 className="text-lg font-semibold mb-2">Current Game Results:</h2>
+        {seats.map((seat) => (
+          <p key={seat} className="mb-1">
+            {players[seat].join(" + ") || "None"}: {scores[seat]}
+          </p>
+        ))}
+      </div>
+      {error && <p className="text-red-400">{error}</p>}
+      {message && <p className="text-green-400">{message}</p>}
+
+      <button
+        onClick={handleSubmit}
+        className={`bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white mt-4 ${areAllSeatsFilled() ? "" : "opacity-50 cursor-not-allowed"}`}
+        disabled={!areAllSeatsFilled()}
+      >
+        Submit Game
+      </button>
     </Layout>
   );
 }
