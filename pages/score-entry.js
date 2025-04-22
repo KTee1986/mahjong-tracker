@@ -145,6 +145,16 @@ export default function ScoreEntry() {
           North: -200,
         });
         setSumOfScores(-800);
+
+        // Copy result to clipboard
+        const resultText = seats.map(seat => `${seat} Player(s): ${flatPlayers[seat] || "None"} - Score: ${adjustedScores[seat]}`).join("\n");
+        navigator.clipboard.writeText(resultText).then(() => {
+          setMessage(message + " Result copied to clipboard!");
+        }).catch(err) => {
+          console.error("Could not copy text: ", err);
+          setMessage(message + " Could not copy result to clipboard. Please copy manually.");
+        });
+
       } else {
         setError(data.error || "Error submitting game.");
       }
