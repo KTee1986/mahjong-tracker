@@ -69,7 +69,8 @@ export default function ScoreEntry() {
 
   const handleColorChange = (seat, color, value) => {
     const newColorCounts = { ...colorCounts };
-    newColorCounts[seat][color] = parseFloat(value || 0);
+    const newValue = Math.max(0, parseFloat(value || 0)); // Ensure non-negative value
+    newColorCounts[seat][color] = newValue;
     setColorCounts(newColorCounts);
     calculateScore(seat, newColorCounts[seat]);
   };
@@ -192,28 +193,31 @@ export default function ScoreEntry() {
           <label className="block font-semibold mt-2">{seat} Chip Count</label>
           <div className="grid grid-cols-4 gap-2">
             {colors.map((color) => (
-              <div key={color} className="flex items-center">
-                <label className="mr-2">{color}:</label>
-                <button
-                  onClick={() => handleColorChange(seat, color, colorCounts[seat][color] - 1)}
-                  className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-black"
-                >
-                  -
-                </button>
-                <input
-                  type="number"
-                  value={colorCounts[seat][color] !== 0 ? colorCounts[seat][color] : ""}
-                  onChange={(e) => handleColorChange(seat, color, e.target.value)}
-                  className="w-8 p-2 rounded bg-gray-800 text-white mt-1 mx-2"
-                  placeholder="0"
-                  style={{ width: `${INPUT_WIDTH_CH}ch` }}
-                />
-                <button
-                  onClick={() => handleColorChange(seat, color, colorCounts[seat][color] + 1)}
-                  className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-black"
-                >
-                  +
-                </button>
+              <div key={color} className="flex flex-col items-center">
+                <label className="mb-2">{color}</label>
+                <div className="flex items-center">
+                  <button
+                    onClick={() => handleColorChange(seat, color, Math.max(0, colorCounts[seat][color] - 1))} // Ensure non-negative
+                    className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-black"
+                  >
+                    -
+                  </button>
+                  <input
+                    type="number"
+                    value={colorCounts[seat][color] !== 0 ? colorCounts[seat][color] : ""}
+                    onChange={(e) => handleColorChange(seat, color, e.target.value)}
+                    className="w-8 p-2 rounded bg-gray-800 text-white mt-1 mx-2"
+                    placeholder="0"
+                    style={{ width: `${INPUT_WIDTH_CH}ch` }}
+                    min="0" // Ensure non-negative input
+                  />
+                  <button
+                    onClick={() => handleColorChange(seat, color, colorCounts[seat][color] + 1)}
+                    className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-black"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
             ))}
           </div>
