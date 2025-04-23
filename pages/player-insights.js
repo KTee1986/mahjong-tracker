@@ -1,5 +1,6 @@
 import Layout from "../components/Layout";
 import { useEffect, useState } from "react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 
 export default function PlayerInsights() {
   const [players, setPlayers] = useState([]);
@@ -7,6 +8,7 @@ export default function PlayerInsights() {
   const [selectedYear, setSelectedYear] = useState("All");
   const [availableYears, setAvailableYears] = useState([]);
   const [insights, setInsights] = useState(null);
+  const [partnerChartData, setPartnerChartData] = useState([]); // For chart data
 
   useEffect(() => {
     fetch("/api/sheet")
@@ -104,6 +106,7 @@ export default function PlayerInsights() {
   const calculateInsights = (data, player) => {
     if (!data[player]) {
       setInsights(null);
+      setPartnerChartData([]); // Clear chart data
       return;
     }
 
@@ -188,9 +191,16 @@ export default function PlayerInsights() {
       worstPartner: worstPartner ? `${worstPartner} (${worstAvgPartner.toFixed(2)})` : "N/A",
       mostFrequentPartner,
       leastFrequentPartner,
-      bestGamePlayer: bestGamePlayer ? `${bestGamePlayer} (${bestAvgGame.toFixed(2)})` : "N/A", // New
-      worstGamePlayer: worstGamePlayer ? `${worstGamePlayer} (${worstAvgGame.toFixed(2)})` : "N/A", // New
+      bestGamePlayer: bestGamePlayer ? `${bestGamePlayer} (${bestAvgGame.toFixed(2)})` : "N/A",
+      worstGamePlayer: worstGamePlayer ? `${worstGamePlayer} (${worstAvgGame.toFixed(2)})` : "N/A",
     });
+
+    // Prepare data for the bar chart
+    const chartData = Object.keys(partnerScores).map(partner => ({
+      name: partner,
+      averageScore: (partnerScores[partner] / partnerCounts[partner]).toFixed(2),
+    }));
+    setPartnerChartData(chartData);
   };
 
   const handlePlayerChange = (e) => {
@@ -255,6 +265,21 @@ export default function PlayerInsights() {
           <p>
             <b>Performs Worst when this player is presented in the same game:</b> {insights.worstGamePlayer || "N/A"}
           </p>
+
+          {/* Bar Chart */}
+          {partnerChartData.length > 0 && (
+            <div className="mt-8">
+              <h3 className="text-md font-semibold mb-2">Average Score When Partnered With</h3>
+              <BarChart width={500} height={300} data={partnerChartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="averageScore" fill="#8884d8" />
+              </BarChart>
+            </div>
+          )}
         </div>
       ) : selectedPlayer ? (
         <p>Loading insights...</p>
