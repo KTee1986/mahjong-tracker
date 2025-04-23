@@ -239,32 +239,50 @@ export default function PlayerInsights() {
       </div>
 
       {selectedPlayer && insights ? (
-        <div className="mt-8">
+        <div className="mt-8 overflow-x-auto">
           <h2 className="text-lg font-semibold mb-2">Insights for {selectedPlayer}</h2>
-          <p>
-            <b>Luckiest Month/Year:</b> {insights.luckiestMonth || "N/A"}
-          </p>
-          <p>
-            <b>Blackest Month/Year:</b> {insights.blackestMonth || "N/A"}
-          </p>
-          <p>
-            <b>Best Player to Partner With:</b> {insights.bestPartner || "N/A"}
-          </p>
-          <p>
-            <b>Worst Player to Partner With:</b> {insights.worstPartner || "N/A"}
-          </p>
-          <p>
-            <b>Most Frequently Paired With:</b> {insights.mostFrequentPartner || "N/A"}
-          </p>
-          <p>
-            <b>Least Frequently Paired With:</b> {insights.leastFrequentPartner || "N/A"}
-          </p>
-          <p>
-            <b>Performs Best when this player is presented in the same game:</b> {insights.bestGamePlayer || "N/A"}
-          </p>
-          <p>
-            <b>Performs Worst when this player is presented in the same game:</b> {insights.worstGamePlayer || "N/A"}
-          </p>
+          <table className="min-w-full table-auto border-collapse border border-gray-700">
+            <thead>
+              <tr className="bg-gray-800 text-white">
+                <th className="border border-gray-700 p-2">Metric</th>
+                <th className="border border-gray-700 p-2">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="border border-gray-700 p-2">Luckiest Month/Year</td>
+                <td className="border border-gray-700 p-2">{insights.luckiestMonth || "N/A"}</td>
+              </tr>
+              <tr>
+                <td className="border border-gray-700 p-2">Blackest Month/Year</td>
+                <td className="border border-gray-700 p-2">{insights.blackestMonth || "N/A"}</td>
+              </tr>
+              <tr>
+                <td className="border border-gray-700 p-2">Best Player to Partner With</td>
+                <td className="border border-gray-700 p-2">{insights.bestPartner || "N/A"}</td>
+              </tr>
+              <tr>
+                <td className="border border-gray-700 p-2">Worst Player to Partner With</td>
+                <td className="border border-gray-700 p-2">{insights.worstPartner || "N/A"}</td>
+              </tr>
+              <tr>
+                <td className="border border-gray-700 p-2">Most Frequently Paired With</td>
+                <td className="border border-gray-700 p-2">{insights.mostFrequentPartner || "N/A"}</td>
+              </tr>
+              <tr>
+                <td className="border border-gray-700 p-2">Least Frequently Paired With</td>
+                <td className="border border-gray-700 p-2">{insights.leastFrequentPartner || "N/A"}</td>
+              </tr>
+              <tr>
+                <td className="border border-gray-700 p-2">Performs Best when this player is presented in the same game</td>
+                <td className="border border-gray-700 p-2">{insights.bestGamePlayer || "N/A"}</td>
+              </tr>
+              <tr>
+                <td className="border border-gray-700 p-2">Performs Worst when this player is presented in the same game</td>
+                <td className="border border-gray-700 p-2">{insights.worstGamePlayer || "N/A"}</td>
+              </tr>
+            </tbody>
+          </table>
 
           {/* Bar Chart */}
           {partnerChartData.length > 0 && (
