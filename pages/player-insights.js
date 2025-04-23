@@ -136,16 +136,20 @@ export default function PlayerInsights() {
     let blackestMonth = "";
     let maxScore = -Infinity;
     let minScore = Infinity;
+    let luckiestScore = 0;
+    let blackestScore = 0;
 
     for (const month in monthlyScores) {
       const score = monthlyScores[month];
       if (score > maxScore) {
         maxScore = score;
         luckiestMonth = month;
+        luckiestScore = score;
       }
       if (score < minScore) {
         minScore = score;
         blackestMonth = month;
+        blackestScore = score;
       }
     }
 
@@ -204,10 +208,10 @@ export default function PlayerInsights() {
     }
 
     setInsights({
-      luckiestMonth,
-      blackestMonth,
-      bestPartner: bestPartner ? `${bestPartner} (${bestAvgPartner.toFixed(2)})` : "N/A",
-      worstPartner: worstPartner ? `${worstPartner} (${worstAvgPartner.toFixed(2)})` : "N/A",
+      luckiestMonth: luckiestMonth ? `${luckiestMonth} (${luckiestScore.toFixed(2)})` : "N/A",
+      blackestMonth: blackestMonth ? `${blackestMonth} (${blackestScore.toFixed(2)})` : "N/A",
+      bestPartner: bestPartner ? `${bestPartner} (${(partnerScores[bestPartner] / partnerCounts[bestPartner]).toFixed(2)})` : "N/A",
+      worstPartner: worstPartner ? `${worstPartner} (${(partnerScores[worstPartner] / partnerCounts[worstPartner]).toFixed(2)})` : "N/A",
       mostFrequentPartner,
       leastFrequentPartner,
       bestGamePlayer: bestGamePlayer ? `${bestGamePlayer} (${bestAvgGame.toFixed(2)})` : "N/A",
