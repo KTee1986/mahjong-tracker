@@ -9,6 +9,7 @@ export default function PlayerInsights() {
   const [availableYears, setAvailableYears] = useState([]);
   const [insights, setInsights] = useState(null);
   const [partnerChartData, setPartnerChartData] = useState([]); // For chart data
+  const [monthlyAverageScores, setMonthlyAverageScores] = useState([]);  // For monthly average scores
 
   useEffect(() => {
     fetch("/api/sheet")
@@ -16,12 +17,14 @@ export default function PlayerInsights() {
       .then(({ data }) => {
         const allPlayers = new Set();
         const years = new Set();
+        const monthlyScores = {}; // Store monthly scores for the chart
 
         const playerData = {}; // Store data for each player
 
         data.slice(1).forEach((row) => {
           const timestamp = row[1];
           const year = timestamp.substring(0, 4);
+          const month = timestamp.substring(5, 7); // MM
           const monthYear = timestamp.substring(0, 7); // YYYY-MM
           years.add(year);
 
@@ -51,8 +54,8 @@ export default function PlayerInsights() {
                   monthlyScores: {},
                   partnerScores: {},
                   partnerCounts: {},
-                  gameScores: {}, // Scores when in the same game
-                  gameCounts: {}, // Counts when in the same game
+                  gameScores: {},
+                  gameCounts: {},
                 };
               }
 
@@ -62,6 +65,13 @@ export default function PlayerInsights() {
               }
               if (selectedYear === "All" || selectedYear === year) {
                 playerData[name].monthlyScores[monthYear] += splitScore;
+
+                // Aggregate scores for the monthly average chart
+                if (!monthlyScores[month]) {
+                  monthlyScores[month] = { totalScore: 0, count: 0 };
+                }
+                monthlyScores[month].totalScore += splitScore;
+                monthlyScores[month].count += 1;
               }
 
               // Partner Data
@@ -100,13 +110,22 @@ export default function PlayerInsights() {
         if (selectedPlayer) {
           calculateInsights(playerData, selectedPlayer);
         }
+
+        // Calculate and set the monthly average scores for the chart
+        const monthlyAverages = Object.keys(monthlyScores)
+          .sort() // Ensure months are in order
+          .map(month => ({
+            month: new Date(2000, parseInt(month) - 1, 1).toLocaleString('default', { month: 'short' }), // Month name
+            averageScore: (monthlyScores[month].totalScore / monthlyScores[month].count).toFixed(2),
+          }));
+        setMonthlyAverageScores(monthlyAverages);
       });
   }, [selectedYear, selectedPlayer]);
 
   const calculateInsights = (data, player) => {
     if (!data[player]) {
       setInsights(null);
-      setPartnerChartData([]); // Clear chart data
+      setPartnerChartData([]);
       return;
     }
 
@@ -195,7 +214,7 @@ export default function PlayerInsights() {
       worstGamePlayer: worstGamePlayer ? `${worstGamePlayer} (${worstAvgGame.toFixed(2)})` : "N/A",
     });
 
-    // Prepare data for the bar chart
+    // Prepare data for the partner bar chart
     const chartData = Object.keys(partnerScores).map(partner => ({
       name: partner,
       averageScore: (partnerScores[partner] / partnerCounts[partner]).toFixed(2),
@@ -244,8 +263,8 @@ export default function PlayerInsights() {
           <table className="min-w-full table-auto border-collapse border border-gray-700">
             <thead>
               <tr className="bg-gray-800 text-white">
-                <th className="border border-gray-700 p-2">Metric</th>
-                <th className="border border-gray-700 p-2">Value</th>
+                <th className="border border-gray-700 p-2 w-1/2">Metric</th>
+                <th className="border border-gray-700 p-2 w-1/2">Value</th>
               </tr>
             </thead>
             <tbody>
@@ -284,7 +303,7 @@ export default function PlayerInsights() {
             </tbody>
           </table>
 
-          {/* Bar Chart */}
+          {/* Partner Average Score Bar Chart */}
           {partnerChartData.length > 0 && (
             <div className="mt-8">
               <h3 className="text-md font-semibold mb-2">Average Score When Partnered With</h3>
@@ -295,6 +314,20 @@ export default function PlayerInsights() {
                 <Tooltip />
                 <Legend />
                 <Bar dataKey="averageScore" fill="#8884d8" />
+              </BarChart>
+            </div>
+          )}
+
+          {/* Monthly Average Score Bar Chart */}
+          {monthlyAverageScores.length > 0 && (
+            <div className="mt-8">
+              <h3 className="text-md font-semibold mb-2">Average Score per Month</h3>
+              <BarChart width={700} height={400} data={monthlyAverageScores}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="averageScore" fill="#82ca9d" />
               </BarChart>
             </div>
           )}
