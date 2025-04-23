@@ -3,14 +3,14 @@ import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
 const navItems = [
-  { label: "(GOOD)Score Entry", path: "/score-entry" },
-  { label: "(GOOD)Running Total", path: "/running-total" },
+  { label: "Score Entry", path: "/score-entry" },
+  { label: "Running Total", path: "/running-total" },
   { label: "Chart", path: "/chart" },
-  { label: "(GOOD)Game History", path: "/game-history" },
-  { label: "Player Insights", path: "/player-insights" },
+  { label: "Game History", path: "/game-history" },
   { label: "Stats", path: "/stats" },
-  { label: "Advanced Stats", path: "/advanced-stats" },
-  { label: "Head-to-Head", path: "/head-to-head" },
+  { label: "Player Insights", path: "/player-insights" },
+  /*{ label: "Advanced Stats", path: "/advanced-stats" },
+  { label: "Head-to-Head", path: "/head-to-head" },*/
   { label: "Player List", path: "/player-list" },
 ];
 
