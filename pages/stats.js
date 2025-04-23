@@ -131,7 +131,7 @@ export default function Stats() {
                   <td className="border border-gray-700 p-2">{row.highest}</td>
                   <td className="border border-gray-700 p-2">{row.lowest}</td>
                 </tr>
-              ))
+              )}
             </tbody>
           </table>
         )}
