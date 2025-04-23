@@ -355,5 +355,5 @@ export default function PlayerInsights() {
         <p>Please select a player to view insights.</p>
       )}
     </Layout>
-  )
+  );
 }
