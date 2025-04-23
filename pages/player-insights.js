@@ -353,7 +353,7 @@ export default function PlayerInsights() {
         <p>Loading insights...</p>
       ) : (
         <p>Please select a player to view insights.</p>
-      );}
+      )}
     </Layout>
-  );}
+  )
 }
