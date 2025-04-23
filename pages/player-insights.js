@@ -30,6 +30,13 @@ export default function PlayerInsights() {
             { players: row[8], score: Number(row[9] || 0) },
           ];
 
+          const allNamesInGame = new Set();
+          seatPairs.forEach((seat) => {
+            if (!seat.players) return;
+            const names = seat.players.split("+").map((p) => p.trim()).filter(Boolean);
+            names.forEach(name => allNamesInGame.add(name));
+          });
+
           seatPairs.forEach((seat) => {
             if (!seat.players) return;
             const names = seat.players.split("+").map((p) => p.trim()).filter(Boolean);
@@ -42,6 +49,8 @@ export default function PlayerInsights() {
                   monthlyScores: {},
                   partnerScores: {},
                   partnerCounts: {},
+                  gameScores: {}, // Scores when in the same game
+                  gameCounts: {}, // Counts when in the same game
                 };
               }
 
@@ -66,6 +75,20 @@ export default function PlayerInsights() {
                   }
                 }
               });
+
+              // Game Data
+              allNamesInGame.forEach(otherPlayer => {
+                if (otherPlayer !== name) {
+                  if (!playerData[name].gameScores[otherPlayer]) {
+                    playerData[name].gameScores[otherPlayer] = 0;
+                    playerData[name].gameCounts[otherPlayer] = 0;
+                  }
+                  if (selectedYear === "All" || selectedYear === year) {
+                    playerData[name].gameScores[otherPlayer] += splitScore;
+                    playerData[name].gameCounts[otherPlayer] += 1;
+                  }
+                }
+              });
             });
           });
         });
@@ -84,7 +107,7 @@ export default function PlayerInsights() {
       return;
     }
 
-    const { monthlyScores, partnerScores, partnerCounts } = data[player];
+    const { monthlyScores, partnerScores, partnerCounts, gameScores, gameCounts } = data[player];
 
     // Luckiest/Blackest Month
     let luckiestMonth = "";
@@ -107,17 +130,17 @@ export default function PlayerInsights() {
     // Best/Worst Partner
     let bestPartner = "";
     let worstPartner = "";
-    let bestAvg = -Infinity;
-    let worstAvg = Infinity;
+    let bestAvgPartner = -Infinity;
+    let worstAvgPartner = Infinity;
 
     for (const partner in partnerScores) {
       const avg = partnerScores[partner] / partnerCounts[partner];
-      if (avg > bestAvg) {
-        bestAvg = avg;
+      if (avg > bestAvgPartner) {
+        bestAvgPartner = avg;
         bestPartner = partner;
       }
-      if (avg < worstAvg) {
-        worstAvg = avg;
+      if (avg < worstAvgPartner) {
+        worstAvgPartner = avg;
         worstPartner = partner;
       }
     }
@@ -125,28 +148,48 @@ export default function PlayerInsights() {
     // Most/Least Frequent Partner
     let mostFrequentPartner = "";
     let leastFrequentPartner = "";
-    let maxCount = 0;
-    let minCount = Infinity;
+    let maxCountPartner = 0;
+    let minCountPartner = Infinity;
 
     for (const partner in partnerCounts) {
       const count = partnerCounts[partner];
-      if (count > maxCount) {
-        maxCount = count;
+      if (count > maxCountPartner) {
+        maxCountPartner = count;
         mostFrequentPartner = partner;
       }
-      if (count < minCount) {
-        minCount = count;
+      if (count < minCountPartner) {
+        minCountPartner = count;
         leastFrequentPartner = partner;
+      }
+    }
+
+    // Best/Worst Game Player
+    let bestGamePlayer = "";
+    let worstGamePlayer = "";
+    let bestAvgGame = -Infinity;
+    let worstAvgGame = Infinity;
+
+    for (const otherPlayer in gameScores) {
+      const avg = gameScores[otherPlayer] / gameCounts[otherPlayer];
+      if (avg > bestAvgGame) {
+        bestAvgGame = avg;
+        bestGamePlayer = otherPlayer;
+      }
+      if (avg < worstAvgGame) {
+        worstAvgGame = avg;
+        worstGamePlayer = otherPlayer;
       }
     }
 
     setInsights({
       luckiestMonth,
       blackestMonth,
-      bestPartner: bestPartner ? `${bestPartner} (${bestAvg.toFixed(2)})` : "N/A",  // Added average
-      worstPartner: worstPartner ? `${worstPartner} (${worstAvg.toFixed(2)})` : "N/A",  // Added average
+      bestPartner: bestPartner ? `${bestPartner} (${bestAvgPartner.toFixed(2)})` : "N/A",
+      worstPartner: worstPartner ? `${worstPartner} (${worstAvgPartner.toFixed(2)})` : "N/A",
       mostFrequentPartner,
       leastFrequentPartner,
+      bestGamePlayer: bestGamePlayer ? `${bestGamePlayer} (${bestAvgGame.toFixed(2)})` : "N/A", // New
+      worstGamePlayer: worstGamePlayer ? `${worstGamePlayer} (${worstAvgGame.toFixed(2)})` : "N/A", // New
     });
   };
 
@@ -205,6 +248,12 @@ export default function PlayerInsights() {
           </p>
           <p>
             <b>Least Frequently Paired With:</b> {insights.leastFrequentPartner || "N/A"}
+          </p>
+          <p>
+            <b>Performs Best when this player is presented in the same game:</b> {insights.bestGamePlayer || "N/A"}
+          </p>
+          <p>
+            <b>Performs Worst when this player is presented in the same game:</b> {insights.worstGamePlayer || "N/A"}
           </p>
         </div>
       ) : selectedPlayer ? (
