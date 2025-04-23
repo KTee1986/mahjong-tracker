@@ -101,7 +101,6 @@ export default function PlayerInsights() {
               });
             });
           });
-        });
 
         setPlayers(Array.from(allPlayers).sort());
         setAvailableYears(["All", ...Array.from(years).sort((a, b) => parseInt(b) - parseInt(a))]);
@@ -125,11 +124,15 @@ export default function PlayerInsights() {
     if (!data[player]) {
       setInsights(null);
       setPartnerChartData([]);
+      setMonthlyAverageScores([]); // Clear monthly chart data
       return;
     }
 
-    const { monthlyScores, partnerScores, partnerCounts, gameScores, gameCounts } = data[player];
+    const { monthlyScores: playerDataMonthlyScores, partnerScores, partnerCounts, gameScores, gameCounts } = data[player]; // Renamed
 
+    const monthlyScores = {}; // Reset monthlyScores for the current player
+
+    // Luckiest/Blackest Month
     let luckiestMonth = "";
     let blackestMonth = "";
     let maxScore = -Infinity;
@@ -137,8 +140,8 @@ export default function PlayerInsights() {
     let luckiestScore = 0;
     let blackestScore = 0;
 
-    for (const month in monthlyScores) {
-      const score = monthlyScores[month];
+    for (const month in playerDataMonthlyScores) { // Use playerDataMonthlyScores
+      const score = playerDataMonthlyScores[month];
       if (score > maxScore) {
         maxScore = score;
         luckiestMonth = month;
@@ -149,8 +152,11 @@ export default function PlayerInsights() {
         blackestMonth = month;
         blackestScore = score;
       }
+
+      monthlyScores[month] = { totalScore: score, count: 1 }; // Populate monthlyScores
     }
 
+    // Best/Worst Partner
     let bestPartner = "";
     let worstPartner = "";
     let bestAvgPartner = -Infinity;
@@ -168,6 +174,7 @@ export default function PlayerInsights() {
       }
     }
 
+    // Most/Least Frequent Partner
     let mostFrequentPartner = "";
     let leastFrequentPartner = "";
     let maxCountPartner = 0;
@@ -185,6 +192,7 @@ export default function PlayerInsights() {
       }
     }
 
+    // Best/Worst Game Player
     let bestGamePlayer = "";
     let worstGamePlayer = "";
     let bestAvgGame = -Infinity;
@@ -218,6 +226,17 @@ export default function PlayerInsights() {
       averageScore: (partnerScores[partner] / partnerCounts[partner]).toFixed(2),
     }));
     setPartnerChartData(chartData);
+
+    // Prepare data for the monthly average score chart (for the selected player)
+    const monthlyAverages = Object.keys(monthlyScores)
+      .sort()
+      .map(month => ({
+        month: months[parseInt(month) - 1],
+        averageScore: parseFloat((monthlyScores[month].totalScore / monthlyScores[month].count).toFixed(2)),
+      }));
+
+    console.log("Monthly Averages Data (in calculateInsights):", JSON.stringify(monthlyAverages, null, 2)); // Log data
+    setMonthlyAverageScores(monthlyAverages);
   };
 
   const handlePlayerChange = (e) => {
@@ -318,7 +337,7 @@ export default function PlayerInsights() {
 
           {/* Monthly Average Score Bar Chart */}
           {monthlyAverageScores.length > 0 && (
-            <div className="mt-8" style={{ backgroundColor: 'lightblue' }}> {/* Temporary background */}
+            <div className="mt-8">
               <h3 className="text-md font-semibold mb-2">Average Score per Month</h3>
               <BarChart width={700} height={400} data={monthlyAverageScores}>
                 <CartesianGrid strokeDasharray="3 3" />
