@@ -2,14 +2,16 @@ import Layout from "../components/Layout";
 import { useEffect, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 
+const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 export default function PlayerInsights() {
   const [players, setPlayers] = useState([]);
   const [selectedPlayer, setSelectedPlayer] = useState("");
   const [selectedYear, setSelectedYear] = useState("All");
   const [availableYears, setAvailableYears] = useState([]);
   const [insights, setInsights] = useState(null);
-  const [partnerChartData, setPartnerChartData] = useState([]); // For chart data
-  const [monthlyAverageScores, setMonthlyAverageScores] = useState([]);  // For monthly average scores
+  const [partnerChartData, setPartnerChartData] = useState([]);
+  const [monthlyAverageScores, setMonthlyAverageScores] = useState([]);
 
   useEffect(() => {
     fetch("/api/sheet")
@@ -17,15 +19,15 @@ export default function PlayerInsights() {
       .then(({ data }) => {
         const allPlayers = new Set();
         const years = new Set();
-        const monthlyScores = {}; // Store monthly scores for the chart
+        const monthlyScores = {};
 
-        const playerData = {}; // Store data for each player
+        const playerData = {};
 
         data.slice(1).forEach((row) => {
           const timestamp = row[1];
           const year = timestamp.substring(0, 4);
-          const month = timestamp.substring(5, 7); // MM
-          const monthYear = timestamp.substring(0, 7); // YYYY-MM
+          const month = timestamp.substring(5, 7);
+          const monthYear = timestamp.substring(0, 7);
           years.add(year);
 
           const seatPairs = [
@@ -59,14 +61,12 @@ export default function PlayerInsights() {
                 };
               }
 
-              // Monthly Scores
               if (!playerData[name].monthlyScores[monthYear]) {
                 playerData[name].monthlyScores[monthYear] = 0;
               }
               if (selectedYear === "All" || selectedYear === year) {
                 playerData[name].monthlyScores[monthYear] += splitScore;
 
-                // Aggregate scores for the monthly average chart
                 if (!monthlyScores[month]) {
                   monthlyScores[month] = { totalScore: 0, count: 0 };
                 }
@@ -74,7 +74,6 @@ export default function PlayerInsights() {
                 monthlyScores[month].count += 1;
               }
 
-              // Partner Data
               names.forEach((partner) => {
                 if (partner !== name) {
                   if (!playerData[name].partnerScores[partner]) {
@@ -88,7 +87,6 @@ export default function PlayerInsights() {
                 }
               });
 
-              // Game Data
               allNamesInGame.forEach(otherPlayer => {
                 if (otherPlayer !== name) {
                   if (!playerData[name].gameScores[otherPlayer]) {
@@ -111,13 +109,14 @@ export default function PlayerInsights() {
           calculateInsights(playerData, selectedPlayer);
         }
 
-        // Calculate and set the monthly average scores for the chart
         const monthlyAverages = Object.keys(monthlyScores)
-          .sort() // Ensure months are in order
+          .sort()
           .map(month => ({
-            month: new Date(2000, parseInt(month) - 1, 1).toLocaleString('default', { month: 'short' }), // Month name
-            averageScore: (monthlyScores[month].totalScore / monthlyScores[month].count).toFixed(2),
+            month: months[parseInt(month) - 1],
+            averageScore: parseFloat((monthlyScores[month].totalScore / monthlyScores[month].count).toFixed(2)), // Ensure number
           }));
+
+        console.log("Monthly Averages Data:", JSON.stringify(monthlyAverages, null, 2)); // Log the data
         setMonthlyAverageScores(monthlyAverages);
       });
   }, [selectedYear, selectedPlayer]);
@@ -131,7 +130,6 @@ export default function PlayerInsights() {
 
     const { monthlyScores, partnerScores, partnerCounts, gameScores, gameCounts } = data[player];
 
-    // Luckiest/Blackest Month
     let luckiestMonth = "";
     let blackestMonth = "";
     let maxScore = -Infinity;
@@ -153,7 +151,6 @@ export default function PlayerInsights() {
       }
     }
 
-    // Best/Worst Partner
     let bestPartner = "";
     let worstPartner = "";
     let bestAvgPartner = -Infinity;
@@ -171,7 +168,6 @@ export default function PlayerInsights() {
       }
     }
 
-    // Most/Least Frequent Partner
     let mostFrequentPartner = "";
     let leastFrequentPartner = "";
     let maxCountPartner = 0;
@@ -189,7 +185,6 @@ export default function PlayerInsights() {
       }
     }
 
-    // Best/Worst Game Player
     let bestGamePlayer = "";
     let worstGamePlayer = "";
     let bestAvgGame = -Infinity;
@@ -218,7 +213,6 @@ export default function PlayerInsights() {
       worstGamePlayer: worstGamePlayer ? `${worstGamePlayer} (${worstAvgGame.toFixed(2)})` : "N/A",
     });
 
-    // Prepare data for the partner bar chart
     const chartData = Object.keys(partnerScores).map(partner => ({
       name: partner,
       averageScore: (partnerScores[partner] / partnerCounts[partner]).toFixed(2),
@@ -324,7 +318,7 @@ export default function PlayerInsights() {
 
           {/* Monthly Average Score Bar Chart */}
           {monthlyAverageScores.length > 0 && (
-            <div className="mt-8">
+            <div className="mt-8" style={{ backgroundColor: 'lightblue' }}> {/* Temporary background */}
               <h3 className="text-md font-semibold mb-2">Average Score per Month</h3>
               <BarChart width={700} height={400} data={monthlyAverageScores}>
                 <CartesianGrid strokeDasharray="3 3" />
