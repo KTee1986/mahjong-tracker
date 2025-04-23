@@ -101,6 +101,7 @@ export default function PlayerInsights() {
               });
             });
           });
+		 });
 
         setPlayers(Array.from(allPlayers).sort());
         setAvailableYears(["All", ...Array.from(years).sort((a, b) => parseInt(b) - parseInt(a))]);
@@ -355,5 +356,5 @@ export default function PlayerInsights() {
         <p>Please select a player to view insights.</p>
       )}
     </Layout>
-  );
+  )
 }
