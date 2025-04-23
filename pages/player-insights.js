@@ -217,28 +217,42 @@ export default function PlayerInsights() {
       playerMonthlyAggregated[monthKey].gameCount += scoreData.count;
     }
 
-    // --- Best/Worst Partner ---
-    let bestPartner = ""; let worstPartner = "";
-    let bestAvgPartner = -Infinity; let worstAvgPartner = Infinity;
+    // --- Prepare Partner Data (for chart and ranking) ---
+    const partnerAverages = [];
     for (const partner in partnerScores) {
       if (partnerCounts[partner] && partnerCounts[partner] > 0) {
           const avg = partnerScores[partner] / partnerCounts[partner];
-          if (avg > bestAvgPartner) { bestAvgPartner = avg; bestPartner = partner; }
-          if (avg < worstAvgPartner) { worstAvgPartner = avg; worstPartner = partner; }
+          partnerAverages.push({ name: partner, averageScore: avg });
       }
     }
+    // Sort partners by average score (descending) for ranking
+    partnerAverages.sort((a, b) => b.averageScore - a.averageScore);
+
+    // Format the ranking string for partners (NEW)
+    const partnerRankingString = partnerAverages
+      .map(p => `${p.name} (${p.averageScore.toFixed(2)})`)
+      .join(" > ") || "N/A";
+
+    // Best/Worst Partner (can derive from sorted array)
+    let bestPartner = partnerAverages.length > 0 ? partnerAverages[0].name : "";
+    let worstPartner = partnerAverages.length > 0 ? partnerAverages[partnerAverages.length - 1].name : "";
+    let bestAvgPartner = partnerAverages.length > 0 ? partnerAverages[0].averageScore : -Infinity;
+    let worstAvgPartner = partnerAverages.length > 0 ? partnerAverages[partnerAverages.length - 1].averageScore : Infinity;
 
      // --- Most/Least Frequent Partner ---
      let mostFrequentPartner = ""; let leastFrequentPartner = "";
      let maxCountPartner = 0; let minCountPartner = Infinity;
+     const partnerFrequency = []; // Store for sorting if needed, or just find min/max directly
      for (const partner in partnerCounts) {
        const count = partnerCounts[partner];
+       if(count > 0) partnerFrequency.push({ name: partner, count: count }); // Keep track if needed
        if (count > maxCountPartner) { maxCountPartner = count; mostFrequentPartner = partner; }
        if (count > 0 && count < minCountPartner) { minCountPartner = count; leastFrequentPartner = partner; }
      }
      if (minCountPartner === Infinity && maxCountPartner > 0) { leastFrequentPartner = mostFrequentPartner; }
      else if (minCountPartner === Infinity) { leastFrequentPartner = "N/A"; }
      if (!mostFrequentPartner) mostFrequentPartner = "N/A";
+
 
      // --- Calculate Game Player Luck Ranking ---
      const gamePlayerAverages = [];
@@ -249,10 +263,9 @@ export default function PlayerInsights() {
        }
      }
      gamePlayerAverages.sort((a, b) => b.avgScore - a.avgScore);
-     // *** UPDATED FORMATTING FOR RANKING STRING ***
      const gamePlayerRankingString = gamePlayerAverages.map(p => `${p.name} (${p.avgScore.toFixed(2)})`).join(" > ") || "N/A";
 
-     // Existing Best/Worst Game Player
+     // Best/Worst Game Player
      let bestGamePlayer = gamePlayerAverages.length > 0 ? gamePlayerAverages[0].name : "";
      let worstGamePlayer = gamePlayerAverages.length > 0 ? gamePlayerAverages[gamePlayerAverages.length - 1].name : "";
      let bestAvgGame = gamePlayerAverages.length > 0 ? gamePlayerAverages[0].avgScore : -Infinity;
@@ -266,18 +279,17 @@ export default function PlayerInsights() {
       worstPartner: worstPartner ? `${worstPartner} (Avg: ${worstAvgPartner.toFixed(2)})` : "N/A",
       mostFrequentPartner: mostFrequentPartner,
       leastFrequentPartner: leastFrequentPartner,
+      partnerScoreRanking: partnerRankingString, // Add the partner ranking stat
       bestGamePlayer: bestGamePlayer ? `${bestGamePlayer} (Avg: ${bestAvgGame.toFixed(2)})` : "N/A",
       worstGamePlayer: worstGamePlayer ? `${worstGamePlayer} (Avg: ${worstAvgGame.toFixed(2)})` : "N/A",
-      gamePlayerLuckRanking: gamePlayerRankingString, // Uses the newly formatted string
+      gamePlayerLuckRanking: gamePlayerRankingString,
     });
 
-    // Prepare data for the partner average score chart
-    const partnerChart = Object.keys(partnerScores).map(partner => {
-        const count = partnerCounts[partner] || 0;
-        const score = partnerScores[partner] || 0;
-        const averageScore = count > 0 ? score / count : 0;
-        return { name: partner, averageScore: parseFloat(averageScore.toFixed(2)) };
-    });
+    // Prepare data for the partner average score chart (use already sorted data, format score)
+    const partnerChart = partnerAverages.map(p => ({
+        name: p.name,
+        averageScore: parseFloat(p.averageScore.toFixed(2)) // Ensure formatted number for chart
+    }));
     setPartnerChartData(partnerChart);
 
     // Calculate and set PLAYER'S monthly averages for the chart
@@ -332,9 +344,13 @@ export default function PlayerInsights() {
                    <tr><td className="border border-gray-700 p-2">Worst Player to Partner With (Avg Score)</td><td className="border border-gray-700 p-2">{insights.worstPartner}</td></tr>
                    <tr><td className="border border-gray-700 p-2">Most Frequently Paired With</td><td className="border border-gray-700 p-2">{insights.mostFrequentPartner}</td></tr>
                    <tr><td className="border border-gray-700 p-2">Least Frequently Paired With</td><td className="border border-gray-700 p-2">{insights.leastFrequentPartner}</td></tr>
+                   {/* *** NEW ROW for Partner Score Ranking *** */}
+                   <tr>
+                     <td className="border border-gray-700 p-2">Partner Score Ranking (Highest Avg Score &gt; Lowest)</td>
+                     <td className="border border-gray-700 p-2 break-words">{insights.partnerScoreRanking}</td>
+                   </tr>
                    <tr><td className="border border-gray-700 p-2">Highest Avg Score When This Player is in Game</td><td className="border border-gray-700 p-2">{insights.bestGamePlayer}</td></tr>
                    <tr><td className="border border-gray-700 p-2">Lowest Avg Score When This Player is in Game</td><td className="border border-gray-700 p-2">{insights.worstGamePlayer}</td></tr>
-                   {/* Game Player Luck Ranking Row */}
                    <tr>
                      <td className="border border-gray-700 p-2">Game Player Luck Ranking (Highest Avg Score &gt; Lowest)</td>
                      <td className="border border-gray-700 p-2 break-words">{insights.gamePlayerLuckRanking}</td>
@@ -346,7 +362,7 @@ export default function PlayerInsights() {
             {partnerChartData.length > 0 ? (
               <div className="mb-8">
                 <h3 className="text-md font-semibold mb-2">Average Score When Partnered With ({selectedPlayer}, {selectedYear})</h3>
-                <BarChart width={600} height={300} data={partnerChartData.map(d => ({...d, averageScore: Number(d.averageScore)}))}>
+                <BarChart width={600} height={300} data={partnerChartData}> {/* Use partnerChartData directly */}
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis domain={['dataMin - 3', 'dataMax + 3']} allowDataOverflow={false} />
