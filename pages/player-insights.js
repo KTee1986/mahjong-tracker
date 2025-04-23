@@ -15,8 +15,7 @@ export default function PlayerInsights() {
   // State for calculated data
   const [insights, setInsights] = useState(null); // Player-specific text insights
   const [partnerChartData, setPartnerChartData] = useState([]); // Player-specific partner chart data
-  // *** NEW state for PLAYER'S monthly average scores ***
-  const [playerMonthlyAverageScores, setPlayerMonthlyAverageScores] = useState([]);
+  const [playerMonthlyAverageScores, setPlayerMonthlyAverageScores] = useState([]); // Player-specific monthly chart data
 
   // State for data management
   const [allGameData, setAllGameData] = useState([]); // Stores raw data from API
@@ -78,13 +77,10 @@ export default function PlayerInsights() {
     if (allGameData.length === 0) {
       console.log("No game data (allGameData) to process.");
       setProcessedPlayerData({});
-      // No need to clear playerMonthlyAverageScores here, it's cleared when player changes
       return;
     }
 
-    // *** REMOVED overall monthly score aggregation ***
-
-    const playerData = {}; // For player-specific insights
+    const playerData = {};
 
     allGameData.forEach((row, index) => {
        if (!row || typeof row !== 'object' || !row[1]) {
@@ -112,10 +108,8 @@ export default function PlayerInsights() {
       const isYearMatch = selectedYear === "All" || selectedYear === year;
 
       const seatPairs = [
-        { players: row[2], score: Number(row[3] || 0) },
-        { players: row[4], score: Number(row[5] || 0) },
-        { players: row[6], score: Number(row[7] || 0) },
-        { players: row[8], score: Number(row[9] || 0) },
+        { players: row[2], score: Number(row[3] || 0) }, { players: row[4], score: Number(row[5] || 0) },
+        { players: row[6], score: Number(row[7] || 0) }, { players: row[8], score: Number(row[9] || 0) },
       ];
 
       const allNamesInGame = new Set();
@@ -140,22 +134,19 @@ export default function PlayerInsights() {
             console.warn(`NaN detected for splitScore in row ${index}, Seat '${playersString}'. Score: ${seat.score}, Names: ${names.length}`);
         }
 
-        // --- Aggregate for PLAYER specific insights ---
         names.forEach((name) => {
           if (!playerData[name]) {
             playerData[name] = {
-              monthlyScores: {}, // Keyed by monthYear "YYYY-MM"
-              partnerScores: {}, partnerCounts: {},
-              gameScores: {}, gameCounts: {},
+              monthlyScores: {}, partnerScores: {}, partnerCounts: {}, gameScores: {}, gameCounts: {},
             };
           }
 
           if (isYearMatch && !isNaN(splitScore)) {
              if (!playerData[name].monthlyScores[monthYear]) {
-                playerData[name].monthlyScores[monthYear] = { totalScore: 0, count: 0 }; // Store score and count
+                playerData[name].monthlyScores[monthYear] = { totalScore: 0, count: 0 };
              }
              playerData[name].monthlyScores[monthYear].totalScore += splitScore;
-             playerData[name].monthlyScores[monthYear].count += 1; // Count games/entries for the player in that month/year
+             playerData[name].monthlyScores[monthYear].count += 1;
 
              names.forEach((partner) => {
                if (partner !== name) {
@@ -180,78 +171,50 @@ export default function PlayerInsights() {
              });
           }
         });
-         // --- END Player Aggregation ---
       });
-    }); // End of iterating through allGameData rows
+    });
 
-    // Set the processed player data state
-    console.log("Processed Player Data:", JSON.stringify(playerData, null, 2)); // Log processed data
+    console.log("Processed Player Data:", JSON.stringify(playerData, null, 2));
     setProcessedPlayerData(playerData);
 
-    // *** REMOVED calculation and setting of OVERALL monthly averages ***
+  }, [allGameData, selectedYear]);
 
-  }, [allGameData, selectedYear]); // Re-process if data or year changes
-
-  // Effect to calculate specific player insights when player selection or processed data changes
+  // Effect to calculate specific player insights
   useEffect(() => {
     if (selectedPlayer && processedPlayerData[selectedPlayer]) {
       console.log(`Calculating insights for player: ${selectedPlayer}`);
       calculateInsights(processedPlayerData, selectedPlayer);
     } else {
-      // Clear insights if no player is selected or player has no data
       setInsights(null);
       setPartnerChartData([]);
-      setPlayerMonthlyAverageScores([]); // Clear player monthly chart too
+      setPlayerMonthlyAverageScores([]);
        if (selectedPlayer) {
           console.log(`No processed data found for selected player: ${selectedPlayer}`);
        }
     }
-  }, [selectedPlayer, processedPlayerData]); // Re-calculate insights if player or data changes
+  }, [selectedPlayer, processedPlayerData]);
 
-  // Calculate player-specific insights AND player-specific monthly averages
+  // Calculate player-specific insights and monthly averages
   const calculateInsights = (data, player) => {
     const {
-        monthlyScores: playerDataMonthlyScores, // Scores keyed by "YYYY-MM" - NOW OBJECTS { totalScore, count }
-        partnerScores, partnerCounts,
-        gameScores, gameCounts
+        monthlyScores: playerDataMonthlyScores, partnerScores, partnerCounts, gameScores, gameCounts
     } = data[player];
 
-    // --- Calculate Luckiest/Blackest Month (based on AVERAGE score in that month/year) ---
-    let luckiestMonth = ""; // Format "YYYY-MM"
-    let blackestMonth = ""; // Format "YYYY-MM"
-    let maxAvgScore = -Infinity;
-    let minAvgScore = Infinity;
-    let luckiestAvgScore = 0;
-    let blackestAvgScore = 0;
-
-    // --- ALSO aggregate scores by CALENDAR month for the player chart ---
-    const playerMonthlyAggregated = {}; // { "01": { totalScore: x, count: y }, ... }
-
-    for (const monthYear in playerDataMonthlyScores) { // monthYear is "YYYY-MM"
+    // --- Luckiest/Blackest Month ---
+    let luckiestMonth = ""; let blackestMonth = "";
+    let maxAvgScore = -Infinity; let minAvgScore = Infinity;
+    let luckiestAvgScore = 0; let blackestAvgScore = 0;
+    const playerMonthlyAggregated = {};
+    for (const monthYear in playerDataMonthlyScores) {
       const scoreData = playerDataMonthlyScores[monthYear];
-      if (!scoreData || scoreData.count <= 0) continue; // Skip if invalid
-
+      if (!scoreData || scoreData.count <= 0) continue;
       const avgScore = scoreData.totalScore / scoreData.count;
-
-      // For luckiest/blackest month stat
-      if (avgScore > maxAvgScore) {
-        maxAvgScore = avgScore;
-        luckiestMonth = monthYear;
-        luckiestAvgScore = avgScore;
-      }
-      if (avgScore < minAvgScore) {
-        minAvgScore = avgScore;
-        blackestMonth = monthYear;
-        blackestAvgScore = avgScore;
-      }
-
-      // For player's monthly average chart
-      const monthKey = monthYear.substring(5, 7); // Extract "MM"
-      if (!playerMonthlyAggregated[monthKey]) {
-          playerMonthlyAggregated[monthKey] = { totalScore: 0, gameCount: 0 }; // Use gameCount or similar
-      }
+      if (avgScore > maxAvgScore) { maxAvgScore = avgScore; luckiestMonth = monthYear; luckiestAvgScore = avgScore; }
+      if (avgScore < minAvgScore) { minAvgScore = avgScore; blackestMonth = monthYear; blackestAvgScore = avgScore; }
+      const monthKey = monthYear.substring(5, 7);
+      if (!playerMonthlyAggregated[monthKey]) { playerMonthlyAggregated[monthKey] = { totalScore: 0, gameCount: 0 }; }
       playerMonthlyAggregated[monthKey].totalScore += scoreData.totalScore;
-      playerMonthlyAggregated[monthKey].gameCount += scoreData.count; // Sum counts across years
+      playerMonthlyAggregated[monthKey].gameCount += scoreData.count;
     }
 
     // --- Best/Worst Partner ---
@@ -277,18 +240,25 @@ export default function PlayerInsights() {
      else if (minCountPartner === Infinity) { leastFrequentPartner = "N/A"; }
      if (!mostFrequentPartner) mostFrequentPartner = "N/A";
 
-     // --- Best/Worst Performance Against Player ---
-     let bestGamePlayer = ""; let worstGamePlayer = "";
-     let bestAvgGame = -Infinity; let worstAvgGame = Infinity;
+     // --- Calculate Game Player Luck Ranking ---
+     const gamePlayerAverages = [];
      for (const otherPlayer in gameScores) {
        if (gameCounts[otherPlayer] && gameCounts[otherPlayer] > 0) {
-           const avg = gameScores[otherPlayer] / gameCounts[otherPlayer];
-           if (avg > bestAvgGame) { bestAvgGame = avg; bestGamePlayer = otherPlayer; }
-           if (avg < worstAvgGame) { worstAvgGame = avg; worstGamePlayer = otherPlayer; }
+         const avg = gameScores[otherPlayer] / gameCounts[otherPlayer];
+         gamePlayerAverages.push({ name: otherPlayer, avgScore: avg });
        }
      }
+     gamePlayerAverages.sort((a, b) => b.avgScore - a.avgScore);
+     // *** UPDATED FORMATTING FOR RANKING STRING ***
+     const gamePlayerRankingString = gamePlayerAverages.map(p => `${p.name} (${p.avgScore.toFixed(2)})`).join(" > ") || "N/A";
 
-    // Set the state for textual insights (using average for luckiest/blackest month now)
+     // Existing Best/Worst Game Player
+     let bestGamePlayer = gamePlayerAverages.length > 0 ? gamePlayerAverages[0].name : "";
+     let worstGamePlayer = gamePlayerAverages.length > 0 ? gamePlayerAverages[gamePlayerAverages.length - 1].name : "";
+     let bestAvgGame = gamePlayerAverages.length > 0 ? gamePlayerAverages[0].avgScore : -Infinity;
+     let worstAvgGame = gamePlayerAverages.length > 0 ? gamePlayerAverages[gamePlayerAverages.length - 1].avgScore : Infinity;
+
+    // Set the state for textual insights
     setInsights({
       luckiestMonth: luckiestMonth ? `${luckiestMonth} (Avg: ${luckiestAvgScore.toFixed(2)})` : "N/A",
       blackestMonth: blackestMonth ? `${blackestMonth} (Avg: ${blackestAvgScore.toFixed(2)})` : "N/A",
@@ -298,6 +268,7 @@ export default function PlayerInsights() {
       leastFrequentPartner: leastFrequentPartner,
       bestGamePlayer: bestGamePlayer ? `${bestGamePlayer} (Avg: ${bestAvgGame.toFixed(2)})` : "N/A",
       worstGamePlayer: worstGamePlayer ? `${worstGamePlayer} (Avg: ${worstAvgGame.toFixed(2)})` : "N/A",
+      gamePlayerLuckRanking: gamePlayerRankingString, // Uses the newly formatted string
     });
 
     // Prepare data for the partner average score chart
@@ -309,45 +280,27 @@ export default function PlayerInsights() {
     });
     setPartnerChartData(partnerChart);
 
-    // *** Calculate and set PLAYER'S monthly averages for the chart ***
-    const playerMonthlyAvgs = Object.keys(playerMonthlyAggregated)
-      .sort()
-      .map(monthKey => {
+    // Calculate and set PLAYER'S monthly averages for the chart
+    const playerMonthlyAvgs = Object.keys(playerMonthlyAggregated).sort().map(monthKey => {
          const monthData = playerMonthlyAggregated[monthKey];
          if (!monthData || monthData.gameCount <= 0) return null;
-
          const averageScore = monthData.totalScore / monthData.gameCount;
          const monthIndex = parseInt(monthKey) - 1;
          if (isNaN(monthIndex) || monthIndex < 0 || monthIndex >= months.length) return null;
-
-         return {
-             month: months[monthIndex],
-             averageScore: parseFloat(averageScore.toFixed(2)),
-         };
-      })
-      .filter(item => item !== null); // Filter out invalid months
-
+         return { month: months[monthIndex], averageScore: parseFloat(averageScore.toFixed(2)) };
+      }).filter(item => item !== null);
     console.log("Player Monthly Average Scores (for Chart):", JSON.stringify(playerMonthlyAvgs, null, 2));
-    setPlayerMonthlyAverageScores(playerMonthlyAvgs); // Update player-specific chart state
+    setPlayerMonthlyAverageScores(playerMonthlyAvgs);
 
   }; // End of calculateInsights function
 
-  // Handler for player dropdown change
-  const handlePlayerChange = (e) => {
-    setSelectedPlayer(e.target.value);
-  };
-
-  // Handler for year dropdown change
-   const handleYearChange = (e) => {
-      setSelectedYear(e.target.value);
-   }
-
+  const handlePlayerChange = (e) => { setSelectedPlayer(e.target.value); };
+  const handleYearChange = (e) => { setSelectedYear(e.target.value); };
 
   // Render the component UI
   return (
     <Layout>
       <h1 className="text-xl font-bold mb-4">Player Insights</h1>
-
       {/* Dropdowns */}
       <div className="mb-4 flex flex-wrap gap-4">
         <div>
@@ -365,18 +318,13 @@ export default function PlayerInsights() {
         </div>
       </div>
 
-        {/* Display Area: Shows Player Insights and Charts */}
+        {/* Display Area */}
         {selectedPlayer && insights ? (
           <div className="mt-8 overflow-x-auto">
-            {/* Player Specific Insights Table */}
+            {/* Insights Table */}
             <h2 className="text-lg font-semibold mb-2">Insights for {selectedPlayer} ({selectedYear})</h2>
             <table className="min-w-full table-auto border-collapse border border-gray-700 mb-8">
-                 <thead>
-                   <tr className="bg-gray-800 text-white">
-                     <th className="border border-gray-700 p-2 w-1/2">Metric</th>
-                     <th className="border border-gray-700 p-2 w-1/2">Value</th>
-                   </tr>
-                 </thead>
+                 <thead><tr className="bg-gray-800 text-white"><th className="border border-gray-700 p-2 w-1/2">Metric</th><th className="border border-gray-700 p-2 w-1/2">Value</th></tr></thead>
                  <tbody>
                    <tr><td className="border border-gray-700 p-2">Luckiest Month/Year (Avg Score)</td><td className="border border-gray-700 p-2">{insights.luckiestMonth}</td></tr>
                    <tr><td className="border border-gray-700 p-2">Blackest Month/Year (Avg Score)</td><td className="border border-gray-700 p-2">{insights.blackestMonth}</td></tr>
@@ -386,12 +334,17 @@ export default function PlayerInsights() {
                    <tr><td className="border border-gray-700 p-2">Least Frequently Paired With</td><td className="border border-gray-700 p-2">{insights.leastFrequentPartner}</td></tr>
                    <tr><td className="border border-gray-700 p-2">Highest Avg Score When This Player is in Game</td><td className="border border-gray-700 p-2">{insights.bestGamePlayer}</td></tr>
                    <tr><td className="border border-gray-700 p-2">Lowest Avg Score When This Player is in Game</td><td className="border border-gray-700 p-2">{insights.worstGamePlayer}</td></tr>
+                   {/* Game Player Luck Ranking Row */}
+                   <tr>
+                     <td className="border border-gray-700 p-2">Game Player Luck Ranking (Highest Avg Score &gt; Lowest)</td>
+                     <td className="border border-gray-700 p-2 break-words">{insights.gamePlayerLuckRanking}</td>
+                   </tr>
                  </tbody>
             </table>
 
-            {/* Player Specific Partner Chart */}
-            {partnerChartData.length > 0 && (
-              <div className="mb-8"> {/* Added margin-bottom */}
+            {/* Partner Chart */}
+            {partnerChartData.length > 0 ? (
+              <div className="mb-8">
                 <h3 className="text-md font-semibold mb-2">Average Score When Partnered With ({selectedPlayer}, {selectedYear})</h3>
                 <BarChart width={600} height={300} data={partnerChartData.map(d => ({...d, averageScore: Number(d.averageScore)}))}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -402,43 +355,27 @@ export default function PlayerInsights() {
                   <Bar dataKey="averageScore" fill="#8884d8" />
                 </BarChart>
               </div>
-            )}
-            {partnerChartData.length === 0 && (
-                <p className="mt-4 mb-8">No partnership data found for {selectedPlayer} in {selectedYear}.</p>
-            )}
+            ) : ( <p className="mt-4 mb-8">No partnership data found for {selectedPlayer} in {selectedYear}.</p> )}
 
-            {/* Player Monthly Average Score Bar Chart */}
-            {/* Uses the new state playerMonthlyAverageScores */}
+            {/* Player Monthly Average Chart */}
             {playerMonthlyAverageScores.length > 0 ? (
               <div className="mt-8">
                 <h3 className="text-md font-semibold mb-2">Average Score per Month for {selectedPlayer} ({selectedYear})</h3>
                 <BarChart width={700} height={400} data={playerMonthlyAverageScores}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
-                  {/* Adjust domain based on potential score range */}
                   <YAxis domain={['auto', 'auto']} />
                   <Tooltip />
                   <Bar dataKey="averageScore" fill="#82ca9d" />
                 </BarChart>
               </div>
-            ) : (
-               <p className="mt-8">No monthly average data available for {selectedPlayer} in {selectedYear}.</p>
-            )}
+            ) : ( <p className="mt-8">No monthly average data available for {selectedPlayer} in {selectedYear}.</p> )}
 
-          </div> /* End of player insights container */
+          </div>
+        ) : selectedPlayer ? ( <p className="mt-4">Loading insights for {selectedPlayer}...</p> )
+          : ( <p className="mt-4">Please select a player to view insights.</p> )}
 
-        ) : selectedPlayer ? (
-           // Message while loading insights for a selected player
-           <p className="mt-4">Loading insights for {selectedPlayer}...</p>
-        ) : (
-          // Message when no player is selected
-          <p className="mt-4">Please select a player to view insights.</p>
-        )}
-
-       {/* Message while data is loading initially or if fetching failed */}
-       {allGameData.length === 0 && !selectedPlayer && ( // Show only if no player selected yet
-           <p className="mt-4">Loading data or no data found from the source...</p>
-       )}
+       {allGameData.length === 0 && !selectedPlayer && ( <p className="mt-4">Loading data or no data found from the source...</p> )}
 
     </Layout>
   )
