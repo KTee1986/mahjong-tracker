@@ -111,29 +111,29 @@ export default function Stats() {
           <p>Loading...</p>
         ) : (
           <table className="min-w-full table-auto border-collapse border border-gray-700">
-            <thead>
-              <tr className="bg-gray-800 text-white">
-                <th className="border border-gray-700 p-2">Player</th>
-                <th className="border border-gray-700 p-2">Games</th>
-                <th className="border border-gray-700 p-2">Win Rate</th>
-                <th className="border border-gray-700 p-2">Avg Score</th>
-                <th className="border border-gray-700 p-2">Highest</th>
-                <th className="border border-gray-700 p-2">Lowest</th>
+          <thead>
+            <tr className="bg-gray-800 text-white">
+              <th className="border border-gray-700 p-2">Player</th>
+              <th className="border border-gray-700 p-2">Games</th>
+              <th className="border border-gray-700 p-2">Win Rate</th>
+              <th className="border border-gray-700 p-2">Avg Score</th>
+              <th className="border border-gray-700 p-2">Highest</th>
+              <th className="border border-gray-700 p-2">Lowest</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.player}>
+                <td className="border border-gray-700 p-2">{row.player}</td>
+                <td className="border border-gray-700 p-2">{row.games}</td>
+                <td className="border border-gray-700 p-2">{row.winRate}</td>
+                <td className="border border-gray-700 p-2">{row.average}</td>
+                <td className="border border-gray-700 p-2">{row.highest}</td>
+                <td className="border border-gray-700 p-2">{row.lowest}</td>
               </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.player}>
-                  <td className="border border-gray-700 p-2">{row.player}</td>
-                  <td className="border border-gray-700 p-2">{row.games}</td>
-                  <td className="border border-gray-700 p-2">{row.winRate}</td>
-                  <td className="border border-gray-700 p-2">{row.average}</td>
-                  <td className="border border-gray-700 p-2">{row.highest}</td>
-                  <td className="border border-gray-700 p-2">{row.lowest}</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+            ))}
+          </tbody>
+        </table>
         )}
       </div>
     </Layout>
