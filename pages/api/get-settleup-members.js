@@ -66,7 +66,7 @@ export default async function handler(req, res) {
 
 
     // --- Call Settle Up API ---
-    const membersApiUrl = `${SETTLE_UP_API_URL}/members/${groupId}.json?auth=${idToken}`;
+    const membersApiUrl = `${SETTLE_UP_API_URL}/groups/${groupId}.json?auth=${idToken}`;
     console.log(`Fetching members from: ${membersApiUrl}`);
 
     const settleUpResponse = await axios.get(membersApiUrl);
