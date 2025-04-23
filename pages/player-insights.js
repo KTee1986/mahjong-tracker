@@ -143,8 +143,8 @@ export default function PlayerInsights() {
     setInsights({
       luckiestMonth,
       blackestMonth,
-      bestPartner,
-      worstPartner,
+      bestPartner: bestPartner ? `${bestPartner} (${bestAvg.toFixed(2)})` : "N/A",  // Added average
+      worstPartner: worstPartner ? `${worstPartner} (${worstAvg.toFixed(2)})` : "N/A",  // Added average
       mostFrequentPartner,
       leastFrequentPartner,
     });
