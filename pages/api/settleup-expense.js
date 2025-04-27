@@ -10,7 +10,6 @@ const getCurrentTimestamp = () => new Date().getTime();
 // Helper function for float precision
 const roundToTwoDecimals = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
 
-
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
         res.setHeader('Allow', ['POST']);
@@ -30,13 +29,12 @@ export default async function handler(req, res) {
 
     // Get target group ID and backend email from environment
     const groupId = process.env.SETTLEUP_GROUP_ID;
-    const backendEmail = process.env.SETTLEUP_BACKEND_EMAIL; // Get email for potential error logging
+    const backendEmail = process.env.SETTLEUP_BACKEND_EMAIL;
 
     if (!groupId) {
         console.error("Environment variable SETTLEUP_GROUP_ID is not set.");
         return res.status(500).json({ error: 'SettleUp group ID configuration missing on server.' });
     }
-     // Check if email is configured (needed for login)
      if (!backendEmail) {
          console.error("Environment variable SETTLEUP_BACKEND_EMAIL is not set.");
          return res.status(500).json({ error: 'SettleUp backend email configuration missing on server.' });
@@ -48,7 +46,7 @@ export default async function handler(req, res) {
     try {
         // --- Step 1: Log in using backend credentials ---
         console.log("SettleUp Expense API: Logging in with backend credentials...");
-        const loginResult = await loginSettleUpBackend(); // Uses env vars internally
+        const loginResult = await loginSettleUpBackend();
         token = loginResult.token;
         console.log("SettleUp Expense API: Backend login successful.");
 
@@ -60,27 +58,16 @@ export default async function handler(req, res) {
         for (const seat in players) {
             const seatPlayers = players[seat];
             const seatScore = scores[seat];
-
-            if (!Array.isArray(seatPlayers)) {
-                console.warn(`Invalid player data for seat ${seat}, expected array.`);
-                continue;
-            }
+            if (!Array.isArray(seatPlayers)) continue; // Skip malformed data
 
             for (const playerObj of seatPlayers) {
                 const memberId = playerObj?.settleUpMemberId;
                 const playerName = playerObj?.name || '(Unknown Name)';
-
                 if (!memberId) {
                     mappingErrors.push(`Missing SettleUp Member ID for player "${playerName}" in seat ${seat}.`);
                     continue;
                 }
-
-                if (aggregatedScores.hasOwnProperty(memberId)) {
-                    aggregatedScores[memberId] += seatScore;
-                } else {
-                    aggregatedScores[memberId] = seatScore;
-                }
-                 aggregatedScores[memberId] = roundToTwoDecimals(aggregatedScores[memberId]);
+                aggregatedScores[memberId] = roundToTwoDecimals((aggregatedScores[memberId] || 0) + seatScore);
             }
         }
 
@@ -90,71 +77,83 @@ export default async function handler(req, res) {
         }
         console.log("SettleUp Expense API: Aggregated scores by Member ID:", aggregatedScores);
 
-        // --- Step 3: Construct the SettleUp Expense Payload ---
-        console.log("SettleUp Expense API: Constructing expense payload...");
-        const expensePayload = {
-            purpose: `Game Score Entry (ID: ${gameId})`,
-            date: getCurrentTimestamp(),
-            currency: "CAD", // Adjust if needed
-            whoPaid: [],
-            participants: [],
-            type: "EXPENSE",
-        };
+        // --- Step 3: Construct the SettleUp Expense Payload (New Structure) ---
+        console.log("SettleUp Expense API: Constructing expense payload (New Structure)...");
 
         let totalPositive = 0;
         let totalNegative = 0;
-        const creditors = [];
-        const debtors = [];
+        const creditors = []; // { memberId: amount } - Still useful for determining whoPaid
+        const involvedParticipants = []; // Store { memberId: memberId } for forWhom list
 
         for (const memberId in aggregatedScores) {
-            const totalScoreForMember = aggregatedScores[memberId];
-            const roundedScore = roundToTwoDecimals(totalScoreForMember);
-
-            if (roundedScore > 0) {
-                totalPositive += roundedScore;
-                creditors.push({ memberId: memberId, amount: roundedScore });
-            } else if (roundedScore < 0) {
-                totalNegative += roundedScore;
-                debtors.push({ memberId: memberId, amount: roundedScore });
+            const roundedScore = roundToTwoDecimals(aggregatedScores[memberId]);
+            if (Math.abs(roundedScore) > 0.01) { // Only consider non-zero scores for participation
+                 involvedParticipants.push({ memberId: memberId }); // Add to participant list
+                 if (roundedScore > 0) {
+                     totalPositive += roundedScore;
+                     creditors.push({ memberId: memberId, amount: roundedScore }); // Keep track of potential payers
+                 } else {
+                     totalNegative += roundedScore;
+                 }
             }
         }
-         totalPositive = roundToTwoDecimals(totalPositive);
-         totalNegative = roundToTwoDecimals(totalNegative);
+        totalPositive = roundToTwoDecimals(totalPositive);
+        totalNegative = roundToTwoDecimals(totalNegative);
 
+        // Validation
         if (Math.abs(totalPositive + totalNegative) > 0.01) {
-             console.error(`Internal calculation error: Aggregated scores do not sum to zero (${totalPositive + totalNegative}). Check rounding or input scores.`);
+             console.error(`Internal calculation error: Aggregated scores do not sum to zero (${totalPositive + totalNegative}).`);
              throw new Error(`Internal calculation error: Aggregated scores do not sum to zero (${roundToTwoDecimals(totalPositive + totalNegative)}). Cannot create balanced expense.`);
         }
 
-        // Define Payer(s) and Participants (ASSUMPTION - TEST THIS with SettleUp API)
-        if (creditors.length > 0) {
-             expensePayload.whoPaid.push({ memberId: creditors[0].memberId, amount: totalPositive });
-             for (const memberId in aggregatedScores) {
-                 const finalScore = roundToTwoDecimals(aggregatedScores[memberId]);
-                 if (Math.abs(finalScore) > 0.01) {
-                     expensePayload.participants.push({
-                         memberId: memberId,
-                         spent: finalScore // Still assuming 'spent' reflects the final aggregated score
-                     });
-                 }
-             }
-        } else {
-            if (debtors.length > 0) {
-                 console.warn("SettleUp Expense API: Only debtors found after aggregation, cannot create expense with the current payer model.");
-                 return res.status(200).json({ message: "Game recorded to sheet, but SettleUp expense skipped (no creditors after aggregation)." });
-            } else {
-                 console.log("SettleUp Expense API: All aggregated scores are zero, skipping SettleUp expense creation.");
-                 return res.status(200).json({ message: "Game recorded to sheet, SettleUp expense skipped (all aggregated scores zero)." });
-            }
+        // Handle cases with no activity or only debt
+        if (involvedParticipants.length === 0) {
+             console.log("SettleUp Expense API: All aggregated scores are zero, skipping SettleUp expense creation.");
+             return res.status(200).json({ message: "Game recorded to sheet, SettleUp expense skipped (all aggregated scores zero)." });
+        }
+        if (creditors.length === 0 && involvedParticipants.length > 0) {
+             console.warn("SettleUp Expense API: Only debtors found after aggregation, cannot create expense with the current model.");
+             return res.status(200).json({ message: "Game recorded to sheet, but SettleUp expense skipped (no creditors after aggregation)." });
         }
 
-        if (expensePayload.participants.length === 0 && expensePayload.whoPaid.length > 0) {
-             console.warn("SettleUp Expense API: Expense has a payer but no participants after filtering zero scores. Skipping creation.");
+        // --- Build the Payload ---
+        const expensePayload = {
+            purpose: `Game Score Entry (ID: ${gameId})`,
+            dateTime: getCurrentTimestamp(), // Use renamed field
+            currencyCode: "CAD",            // Use renamed field, adjust if needed
+            type: "expense",                // Use lowercase value
+            category: "🎲",                 // Added default category (Dice emoji)
+            fixedExchangeRate: false,       // Added field
+            exchangeRates: {},              // Added field (empty)
+            receiptUrl: null,               // Added field (null)
+
+            // Define who paid using weights
+            whoPaid: creditors.length > 0
+                ? [{ memberId: creditors[0].memberId, weight: "1" }] // First creditor paid all, weight 1
+                : [], // Should not happen due to check above, but safety
+
+            // Define items and who the expense was for using weights
+            items: [
+                {
+                    // Amount is the total positive value (total paid)
+                    amount: String(totalPositive), // Amount as string
+                    // forWhom includes all participants with non-zero scores, equal weight
+                    forWhom: involvedParticipants.map(p => ({
+                        memberId: p.memberId,
+                        weight: "1" // Assign equal weight to all involved
+                    }))
+                }
+            ]
+        };
+
+        // Ensure item has participants
+        if (expensePayload.items[0].forWhom.length === 0) {
+             console.warn("SettleUp Expense API: No participants identified for the expense item. Skipping creation.");
              return res.status(200).json({ message: "Game recorded to sheet, SettleUp expense skipped (no non-zero participants)." });
         }
 
         // --- Step 4: Log the payload and Create the Expense ---
-        console.log("SettleUp Expense API: Payload to be sent:", JSON.stringify(expensePayload, null, 2)); // Pretty print JSON
+        console.log("SettleUp Expense API: Payload to be sent:", JSON.stringify(expensePayload, null, 2));
 
         console.log("SettleUp Expense API: Calling createSettleUpExpense...");
         const creationResult = await createSettleUpExpense(groupId, token, expensePayload);
@@ -167,26 +166,15 @@ export default async function handler(req, res) {
         });
 
     } catch (error) {
-        // *** MODIFIED: Added backendEmail to the error log ***
         console.error(`SettleUp Expense API Error (User: ${backendEmail || 'Not Configured'}):`, error.message);
-        // *** END MODIFIED ***
-
         let statusCode = 500;
-        // Determine status code based on error message
-        if (error.message.includes("Invalid backend Settle Up email or password") || error.message.includes("Authentication error") || error.message.includes("Backend SettleUp credentials missing")) {
-             statusCode = 500; // Indicate server config/auth issue
-        } else if (error.message.includes("Could not fetch") || error.message.includes("not found")) {
-             statusCode = 404;
-        } else if (error.message.includes("Failed to create Settle Up expense")) {
-             statusCode = 502; // Error communicating with SettleUp
-        } else if (error.message.includes("Data mapping failed")) {
-             statusCode = 400;
-        } else if (error.message.includes("calculation error")) {
-             statusCode = 500;
-        } else if (error.message.includes("configuration missing")) {
-            statusCode = 500; // Explicitly handle config errors caught earlier
-        }
-
+        // ... (error handling as before) ...
+        if (error.message.includes("Invalid backend Settle Up email or password") || error.message.includes("Authentication error") || error.message.includes("Backend SettleUp credentials missing")) { statusCode = 500; }
+        else if (error.message.includes("Could not fetch") || error.message.includes("not found")) { statusCode = 404; }
+        else if (error.message.includes("Failed to create Settle Up expense")) { statusCode = 502; }
+        else if (error.message.includes("Data mapping failed")) { statusCode = 400; }
+        else if (error.message.includes("calculation error")) { statusCode = 500; }
+        else if (error.message.includes("configuration missing")) { statusCode = 500; }
         return res.status(statusCode).json({ error: error.message || "An internal server error occurred during SettleUp expense creation." });
     }
 }

@@ -4,19 +4,11 @@ import {
     loginSettleUpBackend,
     getUserGroupIds,
     getGroupDetails,
-    getGroupMembers,
-    getGroupPermissions
+    getGroupMembers
+    // Removed getGroupPermissions import
 } from '../../lib/settleup-api';
 
-// Helper function to map permission level number to text
-const mapPermissionLevel = (level) => {
-    switch (level) {
-        case 30: return 'Owner';
-        case 20: return 'Read-Write';
-        case 10: return 'Read-Only';
-        default: return 'Unknown';
-    }
-};
+// Removed mapPermissionLevel helper function
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
@@ -28,31 +20,35 @@ export default async function handler(req, res) {
     let token;
 
     try {
-        // Step 1: Log in
+        // Step 1: Log in using backend credentials
         console.log("API Route (Backend Auth): Attempting login...");
         const loginResult = await loginSettleUpBackend();
         uid = loginResult.uid;
         token = loginResult.token;
         console.log("API Route (Backend Auth): Login successful.");
 
-        // Step 2: Get Group IDs
+        // Step 2: Get User Group IDs
         console.log("API Route (Backend Auth): Fetching group IDs...");
         const groupIdsObject = await getUserGroupIds(uid, token);
+
         if (!groupIdsObject) {
             console.log(`API Route (Backend Auth): User ${uid} has no groups.`);
             return res.status(200).json({ groupsWithMembers: [] });
         }
+
         const groupIds = Object.keys(groupIdsObject);
         console.log(`API Route (Backend Auth): Found group IDs: ${groupIds.join(', ')}`);
 
-        // Step 3: Fetch Details, Members, and Permissions
-        console.log("API Route (Backend Auth): Fetching details, members, and permissions...");
+        // Step 3: Fetch Details and Members for each Group Concurrently
+        // *** REMOVED getGroupPermissions from Promise.all ***
+        console.log("API Route (Backend Auth): Fetching details and members for each group...");
         const groupDataPromises = groupIds.map(async (id) => {
             try {
-                const [details, membersObject, permissionsObject] = await Promise.all([
+                // Fetch only details and members
+                const [details, membersObject] = await Promise.all([
                     getGroupDetails(id, token),
-                    getGroupMembers(id, token),
-                    getGroupPermissions(id, token)
+                    getGroupMembers(id, token)
+                    // Removed getGroupPermissions call
                 ]);
 
                 let membersArray = [];
@@ -62,67 +58,42 @@ export default async function handler(req, res) {
                     console.warn(`API Route (Backend Auth): Failed to fetch members for group ${id}.`);
                     fetchError = true;
                 } else {
-                    // *** MODIFIED: Use firebaseUid (or correct field name) for lookup ***
-                    membersArray = Object.entries(membersObject).map(([memberId, memberData]) => {
-                        // --- Adjust this line based on your actual data structure ---
-                        const userFirebaseUid = memberData?.firebaseUid; // <-- ASSUMING this field exists in memberData
-                        // --- End Adjustment ---
-
-                        let permissionLevel = undefined; // Default if UID is missing or not found in permissions
-                        let permissionText = 'Unknown'; // Default text
-
-                        if (userFirebaseUid && permissionsObject) {
-                            // Use the fetched Firebase UID to look up the permission
-                            const permissionData = permissionsObject[userFirebaseUid];
-                            permissionLevel = permissionData?.level;
-                            permissionText = mapPermissionLevel(permissionLevel);
-                            // Log if UID was found but no permission level (might indicate data issue)
-                            // if (permissionData && typeof permissionLevel === 'undefined') {
-                            //     console.warn(`Permission data found for UID ${userFirebaseUid} in group ${id}, but 'level' property is missing.`);
-                            // }
-                        } else if (!userFirebaseUid) {
-                             console.warn(`Firebase UID field ('firebaseUid') missing for member ${memberData?.name || memberId} in group ${id}. Cannot map permission.`);
-                             permissionText = 'N/A (No UID)';
-                        } else {
-                             // permissionsObject might be null if fetch failed
-                             permissionText = 'N/A (Perms Fetch Failed)';
-                        }
-
-
-                        return {
-                            memberId: memberId,
-                            name: memberData?.name || '(No Name)',
-                            active: memberData?.active === true,
-                            permission: permissionText // Use the mapped text
-                        };
-                    });
-                    // *** END MODIFIED ***
+                    // *** REVERTED: Simplified member object creation ***
+                    membersArray = Object.entries(membersObject).map(([memberId, memberData]) => ({
+                        memberId: memberId,
+                        name: memberData?.name || '(No Name)',
+                        active: memberData?.active === true
+                        // Removed permission field
+                    }));
+                    // *** END REVERTED ***
                 }
 
                 if (details === null) {
                     console.warn(`API Route (Backend Auth): Failed to fetch details for group ${id}.`);
                     fetchError = true;
                 }
-                 if (permissionsObject === null) {
-                    console.warn(`API Route (Backend Auth): Failed to fetch permissions for group ${id}. Permission levels might be missing.`);
-                    // Note: We still try to build the members array above, permissions will just be N/A
-                 }
+                // Removed check/warning for permissionsObject === null
 
                 return {
                     id: id,
                     name: details?.name || '(No Name / Fetch Failed)',
-                    members: membersArray,
+                    members: membersArray, // Array no longer includes permission
                     fetchError: fetchError
                 };
             } catch (groupError) {
                 console.error(`API Route (Backend Auth): Unexpected error fetching data for group ${id}:`, groupError);
-                return { id: id, name: '(Error Fetching Data)', members: [], fetchError: true };
+                return {
+                    id: id,
+                    name: '(Error Fetching Data)',
+                    members: [],
+                    fetchError: true
+                };
             }
         });
 
         const groupsWithMembers = await Promise.all(groupDataPromises);
 
-        console.log("API Route (Backend Auth): Successfully prepared combined group and member data with permissions.");
+        console.log("API Route (Backend Auth): Successfully prepared combined group and member data.");
         // Step 4: Return Combined Data
         return res.status(200).json({ groupsWithMembers });
 
