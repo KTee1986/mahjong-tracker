@@ -4,28 +4,15 @@ import Layout from "../components/Layout"; // Assuming you have a Layout compone
 import { useRouter } from "next/router";
 
 export default function SettleUpGroupsAndMembers() {
-  // Removed email and password state
   const router = useRouter();
-
-  // State for API interaction
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-
-  // State to store the fetched data
-  const [groupData, setGroupData] = useState(null);
+  const [groupData, setGroupData] = useState(null); // Expects members to have { memberId, name, active, isAdmin }
 
   // Optional: Add authentication check for your own application if needed
-  // useEffect(() => {
-  //   const loggedIn = sessionStorage.getItem("isLoggedIn");
-  //   if (loggedIn !== "true") {
-  //     router.replace("/login");
-  //   }
-  // }, [router]);
+  // useEffect(() => { ... }, [router]);
 
-  /**
-   * Handles fetching the groups and members using backend credentials.
-   */
   const handleFetchData = async () => {
     setIsLoading(true);
     setError("");
@@ -33,32 +20,17 @@ export default function SettleUpGroupsAndMembers() {
     setGroupData(null);
 
     try {
-      // Call the backend endpoint. No body needed.
       const res = await fetch('/api/get-settleup-groups-and-members', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        // No body - backend uses environment variables
+        headers: { 'Content-Type': 'application/json' },
       });
-
       const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data.error || `Error: ${res.status} ${res.statusText}`);
-      }
-
-      if (!data || !Array.isArray(data.groupsWithMembers)) {
-          console.error("Unexpected response format. Expected { groupsWithMembers: [...] }", data);
-          throw new Error("Received unexpected data format from the server.");
-      }
+      if (!res.ok) throw new Error(data.error || `Error: ${res.status} ${res.statusText}`);
+      if (!data || !Array.isArray(data.groupsWithMembers)) throw new Error("Received unexpected data format from the server.");
 
       setGroupData(data.groupsWithMembers);
-      if (data.groupsWithMembers.length === 0) {
-        setMessage("No Settle Up groups found for the configured backend account.");
-      } else {
-         setMessage("Data fetched successfully.");
-      }
+      setMessage(data.groupsWithMembers.length === 0 ? "No Settle Up groups found for the configured backend account." : "Data fetched successfully.");
 
     } catch (err) {
       console.error("Fetch error:", err);
@@ -70,6 +42,7 @@ export default function SettleUpGroupsAndMembers() {
 
   /**
    * Renders the table for members of a single group.
+   * @param {Array} members - Array of member objects including isAdmin.
    */
   const renderMemberTable = (members) => {
     if (!members || members.length === 0) {
@@ -90,6 +63,11 @@ export default function SettleUpGroupsAndMembers() {
               <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Active
               </th>
+              {/* *** ADDED: Permission Column Header *** */}
+              <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Permission
+              </th>
+              {/* *** END ADDED *** */}
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -102,8 +80,20 @@ export default function SettleUpGroupsAndMembers() {
                   <code className="text-xs bg-gray-100 px-1 rounded">{member.memberId}</code>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                  {/* Display Yes/No based on boolean */}
                   {member.active ? 'Yes' : 'No'}
                 </td>
+                {/* *** ADDED: Permission Column Data *** */}
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                  {/* Display Admin/Member based on boolean isAdmin field */}
+                  {member.isAdmin ? (
+                    <span className="font-semibold text-red-600">Admin</span>
+                  ) : (
+                    'Member'
+                  )}
+                  {/* If using a 'role' field instead: {member.role} */}
+                </td>
+                {/* *** END ADDED *** */}
               </tr>
             ))}
           </tbody>
@@ -132,25 +122,13 @@ export default function SettleUpGroupsAndMembers() {
       </div>
 
       {/* Loading State */}
-      {isLoading && (
-        <div className="text-center p-4">
-          <p className="text-indigo-600">Loading data...</p>
-        </div>
-      )}
+      {isLoading && ( <div className="text-center p-4"><p className="text-indigo-600">Loading data...</p></div> )}
 
       {/* Error Display */}
-      {error && (
-        <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-md shadow-sm">
-          <p><span className="font-bold">Error:</span> {error}</p>
-        </div>
-      )}
+      {error && ( <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-md shadow-sm"><p><span className="font-bold">Error:</span> {error}</p></div> )}
 
-       {/* Success/Info Message Display */}
-      {message && !error && (
-        <div className="mt-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-md shadow-sm">
-          <p>{message}</p>
-        </div>
-      )}
+      {/* Success/Info Message Display */}
+      {message && !error && ( <div className="mt-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-md shadow-sm"><p>{message}</p></div> )}
 
       {/* Results Display */}
       {groupData && !isLoading && (
@@ -165,7 +143,7 @@ export default function SettleUpGroupsAndMembers() {
                 {group.fetchError ? (
                    <p className="italic text-sm text-red-600 px-4">Could not fetch full details or members for this group.</p>
                 ) : (
-                   renderMemberTable(group.members)
+                   renderMemberTable(group.members) // This function now renders the extra column
                 )}
               </div>
             ))

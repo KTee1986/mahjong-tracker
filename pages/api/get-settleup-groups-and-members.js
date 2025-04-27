@@ -1,37 +1,30 @@
 // pages/api/get-settleup-groups-and-members.js
 
 import {
-    loginSettleUpBackend, // Use backend login
+    loginSettleUpBackend,
     getUserGroupIds,
     getGroupDetails,
     getGroupMembers
 } from '../../lib/settleup-api';
 
 export default async function handler(req, res) {
-    // Only allow POST requests
     if (req.method !== 'POST') {
         res.setHeader('Allow', ['POST']);
         return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
     }
 
-    // ** No longer expecting email/password in req.body **
-    // const { email, password } = req.body;
-    // if (!email || !password) {
-    //     return res.status(400).json({ error: 'Email and password are required.' });
-    // }
-
     let uid;
     let token;
 
     try {
-        // --- Step 1: Log in using backend credentials ---
+        // Step 1: Log in using backend credentials
         console.log("API Route (Backend Auth): Attempting login...");
-        const loginResult = await loginSettleUpBackend(); // Call backend login
+        const loginResult = await loginSettleUpBackend();
         uid = loginResult.uid;
         token = loginResult.token;
         console.log("API Route (Backend Auth): Login successful.");
 
-        // --- Step 2: Get User Group IDs ---
+        // Step 2: Get User Group IDs
         console.log("API Route (Backend Auth): Fetching group IDs...");
         const groupIdsObject = await getUserGroupIds(uid, token);
 
@@ -43,7 +36,7 @@ export default async function handler(req, res) {
         const groupIds = Object.keys(groupIdsObject);
         console.log(`API Route (Backend Auth): Found group IDs: ${groupIds.join(', ')}`);
 
-        // --- Step 3: Fetch Details and Members for each Group Concurrently ---
+        // Step 3: Fetch Details and Members for each Group Concurrently
         console.log("API Route (Backend Auth): Fetching details and members for each group...");
         const groupDataPromises = groupIds.map(async (id) => {
             try {
@@ -59,11 +52,16 @@ export default async function handler(req, res) {
                     console.warn(`API Route (Backend Auth): Failed to fetch members for group ${id}.`);
                     fetchError = true;
                 } else {
+                    // *** MODIFIED: Extract isAdmin field ***
                     membersArray = Object.entries(membersObject).map(([memberId, memberData]) => ({
                         memberId: memberId,
                         name: memberData?.name || '(No Name)',
-                        active: memberData?.active === true
+                        active: memberData?.active === true, // Ensure boolean
+                        isAdmin: memberData?.isAdmin === true // Extract isAdmin, default to false if missing/undefined
+                        // If the field is named differently (e.g., 'role'), adjust here:
+                        // role: memberData?.role || 'member'
                     }));
+                    // *** END MODIFIED ***
                 }
 
                 if (details === null) {
@@ -74,7 +72,7 @@ export default async function handler(req, res) {
                 return {
                     id: id,
                     name: details?.name || '(No Name / Fetch Failed)',
-                    members: membersArray,
+                    members: membersArray, // Array now includes isAdmin
                     fetchError: fetchError
                 };
             } catch (groupError) {
@@ -91,17 +89,16 @@ export default async function handler(req, res) {
         const groupsWithMembers = await Promise.all(groupDataPromises);
 
         console.log("API Route (Backend Auth): Successfully prepared combined group and member data.");
-        // --- Step 4: Return Combined Data ---
+        // Step 4: Return Combined Data
         return res.status(200).json({ groupsWithMembers });
 
     } catch (error) {
         console.error("API Route (Backend Auth) Error:", error.message);
         let statusCode = 500;
-        // Specific error handling based on messages from loginSettleUpBackend etc.
         if (error.message.includes("Invalid backend Settle Up email or password") || error.message.includes("Backend SettleUp credentials missing")) {
-            statusCode = 500; // Server configuration error
+            statusCode = 500;
         } else if (error.message.includes("Authentication error")) {
-             statusCode = 403; // Or 500 if it's backend config issue
+             statusCode = 403;
         } else if (error.message.includes("Failed to initialize Firebase") || error.message.includes("Firebase Auth service not available")) {
              statusCode = 500;
         } else if (error.message.includes("Firebase configuration is incomplete")) {
