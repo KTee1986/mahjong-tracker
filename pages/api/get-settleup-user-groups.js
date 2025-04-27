@@ -1,7 +1,30 @@
 // pages/api/get-settleup-user-groups.js
-import { loginSettleUp, getUserGroupIds, getGroupDetails } from '../../lib/settleup-api';
 
-export default async function handler(req, res) {
+// --- Use require to import the helper functions ---
+let loginSettleUp, getUserGroupIds, getGroupDetails;
+try {
+    const settleUpApi = require('../../lib/settleup-api');
+    loginSettleUp = settleUpApi.loginSettleUp;
+    getUserGroupIds = settleUpApi.getUserGroupIds;
+    getGroupDetails = settleUpApi.getGroupDetails;
+    if (!loginSettleUp || !getUserGroupIds || !getGroupDetails) {
+        throw new Error("One or more functions missing from settleup-api module.");
+    }
+} catch (e) {
+    console.error("FATAL: Failed to require settleup-api module.", e);
+    // If the helper module itself fails to load, the API route cannot function.
+    // Send a 500 error immediately.
+    // Note: This specific response might not be reachable if the process exits during require.
+    module.exports = async (req, res) => {
+        res.status(500).json({ error: "Internal server error: Failed to load core API library." });
+    };
+    // Re-throw the error to ensure the process logs it clearly if possible
+    throw e;
+}
+
+
+// Define the main handler function using module.exports for consistency with require
+module.exports = async (req, res) => {
     // Ensure this is a POST request
     if (req.method !== 'POST') {
         res.setHeader('Allow', ['POST']);
@@ -20,7 +43,6 @@ export default async function handler(req, res) {
 
     try {
         // --- Step 1: Log in to Settle Up ---
-        // IMPORTANT: Using user-provided credentials here. See security note in settleup-api.js.
         const loginResult = await loginSettleUp(email, password);
         uid = loginResult.uid;
         token = loginResult.token;
@@ -29,9 +51,8 @@ export default async function handler(req, res) {
         const groupIdsObject = await getUserGroupIds(uid, token);
 
         if (!groupIdsObject) {
-            // User might be valid but belong to no groups
-            console.log(`User ${uid} belongs to no groups.`);
-            return res.status(200).json({ groups: [] }); // Return empty array
+            console.log(`User ${uid} belongs to no groups or path not found.`);
+            return res.status(200).json({ groups: [] });
         }
 
         const groupIds = Object.keys(groupIdsObject);
@@ -39,11 +60,7 @@ export default async function handler(req, res) {
 
         // --- Step 3: Fetch details (specifically the name) for each group ---
         const groupDetailsPromises = groupIds.map(id =>
-            getGroupDetails(id, token).catch(err => {
-                // Log error fetching details for a specific group but don't fail the whole request
-                console.error(`Failed to fetch details for group ${id}: ${err.message}`);
-                return null; // Return null for groups that couldn't be fetched
-            })
+            getGroupDetails(id, token) // Error handling is now inside getGroupDetails
         );
 
         const groupDetailsResults = await Promise.all(groupDetailsPromises);
@@ -51,34 +68,40 @@ export default async function handler(req, res) {
         // --- Step 4: Format the response ---
         const groups = groupDetailsResults
             .map((details, index) => {
-                // Filter out null results (groups that failed to fetch)
-                // and ensure details object and name exist
+                // Filter out null results (groups that failed to fetch or had no name)
                 if (details && details.name) {
                     return {
-                        id: groupIds[index], // Get the ID from the original list
+                        id: groupIds[index],
                         name: details.name,
-                        // Add other details if needed and available
                     };
                 }
-                return null; // Exclude this group if details are missing/failed
+                // Log if details were fetched but name was missing
+                if (details && !details.name) {
+                     console.warn(`Group ${groupIds[index]} fetched but missing 'name' property.`);
+                }
+                return null; // Exclude groups that failed, had no details, or no name
             })
-            .filter(group => group !== null); // Remove null entries
+            .filter(group => group !== null);
 
         console.log("Successfully prepared groups data for response:", groups);
-        return res.status(200).json({ groups }); // Send the array of groups
+        return res.status(200).json({ groups });
 
     } catch (error) {
-        // Handle errors from login, fetching group IDs, or other unexpected issues
         console.error("API Error in /api/get-settleup-user-groups:", error.message);
 
-        // Check for specific error messages to return appropriate status codes
         if (error.message.includes("Invalid Settle Up email or password")) {
-            return res.status(401).json({ error: error.message }); // Unauthorized
+            return res.status(401).json({ error: error.message });
         }
-        if (error.message.includes("Authentication failed")) {
-            return res.status(403).json({ error: error.message }); // Forbidden / Auth Issue
+        if (error.message.includes("Authentication error") || error.message.includes("authentication failed")) {
+             return res.status(403).json({ error: "Settle Up authentication or authorization failed." });
         }
-        // Generic server error for other cases
-        return res.status(500).json({ error: "An internal server error occurred." });
+        if (error.message.includes("Failed to initialize Firebase") || error.message.includes("Firebase SDK was not loaded")) {
+             return res.status(500).json({ error: "Internal server error: Firebase initialization failed." });
+        }
+         if (error.message.includes("Firebase configuration is incomplete")) {
+             return res.status(500).json({ error: "Internal server error: Firebase configuration missing." });
+        }
+        // Generic server error
+        return res.status(500).json({ error: "An internal server error occurred while fetching groups." });
     }
-}
+};
