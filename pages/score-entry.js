@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react"; // Added useCallback
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 
@@ -6,17 +6,21 @@ const seats = ["East", "South", "West", "North"];
 const colors = ["Red", "Blue", "Green", "White"];
 const colorValues = { Red: 20, Blue: 10, Green: 2, White: 0.4 };
 const MAX_PLAYERS_PER_SEAT = 2;
-const INPUT_WIDTH_CH = 3; // Adjusted width for display
+const INPUT_WIDTH_CH = 3;
 
 export default function ScoreEntry() {
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(null);
+
+  // --- MODIFIED: Store array of player objects { name, settleUpMemberId } per seat ---
   const [players, setPlayers] = useState({
     East: [],
     South: [],
     West: [],
     North: [],
   });
+  // --- END MODIFIED ---
+
   const [colorCounts, setColorCounts] = useState({
     East: { Red: 0, Blue: 0, Green: 0, White: 0 },
     South: { Red: 0, Blue: 0, Green: 0, White: 0 },
@@ -29,12 +33,16 @@ export default function ScoreEntry() {
     West: -200,
     North: -200,
   });
-  const [availablePlayers, setAvailablePlayers] = useState([]);
+
+  // --- MODIFIED: Expect players with { name, settleUpMemberId } ---
+  const [availablePlayers, setAvailablePlayers] = useState([]); // Array of { name, settleUpMemberId }
+  // --- END MODIFIED ---
+
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [sumOfScores, setSumOfScores] = useState(-800);
-  const [latestGameResult, setLatestGameResult] = useState(null); // State to hold the latest game result
-  const [isSubmitting, setIsSubmitting] = useState(false); // Prevent double-submit
+  const [latestGameResult, setLatestGameResult] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const admin = sessionStorage.getItem("admin");
@@ -43,34 +51,50 @@ export default function ScoreEntry() {
   }, [router]);
 
   useEffect(() => {
-    fetch("/api/players")
-      .then((res) => res.json())
+    // --- MODIFIED: Fetch players, expecting settleUpMemberId ---
+    fetch("/api/players") // Ensure this API returns [{ name, settleUpMemberId }, ...]
+      .then((res) => {
+          if (!res.ok) throw new Error(`Failed to fetch players: ${res.statusText}`);
+          return res.json();
+      })
       .then(({ data }) => {
-        setAvailablePlayers(data);
+        // Validate data structure
+        if (!Array.isArray(data) || (data.length > 0 && (!data[0].name || !data[0].settleUpMemberId))) {
+            console.error("Invalid player data received:", data);
+            setError("Error: Invalid player data format received from API. Expected [{ name, settleUpMemberId }, ...]");
+            setAvailablePlayers([]); // Set to empty array on error
+        } else {
+            setAvailablePlayers(data);
+        }
       })
       .catch((err) => {
-        setError("Error fetching players.");
+        setError("Error fetching players. Ensure /api/players returns correct data including 'settleUpMemberId'.");
         console.error(err);
+         setAvailablePlayers([]); // Set to empty array on fetch error
       });
+     // --- END MODIFIED ---
   }, []);
 
-  const handlePlayerSelect = (seat, playerName) => {
+  // --- MODIFIED: Handle player OBJECT selection ---
+  const handlePlayerSelect = (seat, playerObject) => {
     setPlayers((prevPlayers) => {
       const newPlayers = { ...prevPlayers };
-      const seatPlayers = newPlayers[seat];
+      const seatPlayers = newPlayers[seat]; // Array of player objects
+      const isSelected = seatPlayers.some(p => p.settleUpMemberId === playerObject.settleUpMemberId);
 
-      if (seatPlayers.includes(playerName)) {
-        // Deselect player
-        newPlayers[seat] = seatPlayers.filter((p) => p !== playerName);
+      if (isSelected) {
+        // Deselect player by filtering based on ID
+        newPlayers[seat] = seatPlayers.filter((p) => p.settleUpMemberId !== playerObject.settleUpMemberId);
       } else if (seatPlayers.length < MAX_PLAYERS_PER_SEAT) {
-        // Select player if not full
-        newPlayers[seat] = [...seatPlayers, playerName];
+        // Select player object if not full
+        newPlayers[seat] = [...seatPlayers, playerObject];
       }
+      // No change if seat is full and player wasn't selected
       return newPlayers;
     });
   };
+  // --- END MODIFIED ---
 
-  // Use useCallback to memoize calculateScore
   const calculateScore = useCallback((seat, counts) => {
     let total = 0;
     for (const color in counts) {
@@ -78,16 +102,15 @@ export default function ScoreEntry() {
     }
     const finalScore = parseFloat(total.toFixed(1)) - 200;
     setScores((prevScores) => ({ ...prevScores, [seat]: finalScore }));
-  }, []); // No dependencies needed if colorValues is constant
+  }, []);
 
 
   const handleColorChange = (seat, color, change) => {
     const newColorCounts = { ...colorCounts };
     const currentValue = newColorCounts[seat][color] || 0;
-    const newValue = Math.max(0, currentValue + change); // Ensure non-negative
+    const newValue = Math.max(0, currentValue + change);
     newColorCounts[seat][color] = newValue;
     setColorCounts(newColorCounts);
-    // Pass the updated counts for the specific seat directly
     calculateScore(seat, newColorCounts[seat]);
   };
 
@@ -100,19 +123,19 @@ export default function ScoreEntry() {
     setSumOfScores(parseFloat(newSum.toFixed(1)));
   }, [scores]);
 
-  // --- Settle Up Integration Logic ---
+  // --- MODIFIED: Send structured player data to Settle Up API ---
   const triggerSettleUpIntegration = async (gameData) => {
     setMessage(prev => prev + " | Attempting Settle Up sync...");
     try {
-      const settleUpRes = await fetch("/api/settleup-expense", { // NEW: Call your backend endpoint
+      const settleUpRes = await fetch("/api/settleup-expense", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Send relevant data. Your backend needs this to figure out
-        // member IDs, group ID, amounts, payer/payees etc.
         body: JSON.stringify({
-          gameId: gameData.gameId, // Pass gameId for reference
-          scores: gameData.scores, // e.g., { East: 150, South: -50, West: -50, North: -50 }
-          players: gameData.players // e.g., { East: "Alice", South: "Bob", West: "Charlie", North: "David" }
+          gameId: gameData.gameId,
+          scores: gameData.scores, // Send scores as before { East: 100, ... }
+          // Send the structured players state directly
+          // Backend will extract settleUpMemberId
+          players: gameData.players, // Send { East: [{ name, id }, ...], ... }
         }),
       });
 
@@ -122,35 +145,33 @@ export default function ScoreEntry() {
         setMessage(prev => prev + " | Settle Up sync successful!");
       } else {
         console.error("Settle Up API Error:", settleUpData.error);
-        setError(prev => prev + ` | Settle Up Error: ${settleUpData.error || 'Unknown error'}`);
-        setMessage(prev => prev.replace(" | Attempting Settle Up sync...", "")); // Clear attempting message on error
+        setError(prev => (prev ? prev + " | " : "") + `Settle Up Error: ${settleUpData.error || 'Unknown error'}`);
+        setMessage(prev => prev.replace(" | Attempting Settle Up sync...", ""));
       }
     } catch (err) {
       console.error("Failed to trigger Settle Up integration:", err);
-      setError(prev => prev + ` | Failed to connect for Settle Up sync.`);
-      setMessage(prev => prev.replace(" | Attempting Settle Up sync...", "")); // Clear attempting message on error
+      setError(prev => (prev ? prev + " | " : "") + `Failed to connect for Settle Up sync.`);
+      setMessage(prev => prev.replace(" | Attempting Settle Up sync...", ""));
     }
   }
-  // --- End Settle Up Integration Logic ---
+  // --- END MODIFIED ---
 
   const handleSubmit = async () => {
-    if (isSubmitting) return; // Prevent double clicks
+    if (isSubmitting) return;
 
     setError("");
     setMessage("");
     setIsSubmitting(true);
 
-    // Use a tolerance for floating point comparison
     if (Math.abs(sumOfScores) > 0.01) {
       setError("Sum of scores must be exactly 0.");
       setIsSubmitting(false);
       return;
     }
 
-    // Check if at least one seat has a player AND a non-default score
     const filledSeatsData = seats.map(seat => ({
         seat,
-        players: players[seat],
+        players: players[seat], // Array of player objects
         score: scores[seat]
     }));
 
@@ -164,30 +185,35 @@ export default function ScoreEntry() {
       return;
     }
 
-     // Ensure all seats with players also have scores entered (are not -200)
     const seatsWithPlayersButNoScore = filledSeatsData.filter(
         s => s.players.length > 0 && s.score === -200
     );
     if (seatsWithPlayersButNoScore.length > 0) {
-        setError(`Seat(s) ${seatsWithPlayersButNoScore.map(s=>s.seat).join(', ')} have players selected but no scores entered (defaulting to -200). Please enter scores or remove players.`);
+        setError(`Seat(s) ${seatsWithPlayersButNoScore.map(s=>s.seat).join(', ')} have players selected but no scores entered. Please enter scores or remove players.`);
         setIsSubmitting(false);
         return;
     }
 
+    // --- MODIFIED: Prepare data for Sheet API (needs names) ---
+    const sheetPlayersPayload = {};
+    for (const seat of seats) {
+        // Extract names from player objects and join them
+        sheetPlayersPayload[seat] = players[seat].map(p => p.name).join(" + ");
+    }
+    // --- END MODIFIED ---
 
-    const flatPlayers = {};
     const adjustedScores = {};
     for (const seat of seats) {
-      flatPlayers[seat] = players[seat].join(" + "); // Keep player joining logic
       adjustedScores[seat] = parseFloat(scores[seat].toFixed(1));
     }
 
     try {
-      // 1. Submit to Google Sheet
+      // 1. Submit to Google Sheet (using names)
       const res = await fetch("/api/sheet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ players: flatPlayers, scores: adjustedScores }),
+        // Send payload with joined names
+        body: JSON.stringify({ players: sheetPlayersPayload, scores: adjustedScores }),
       });
 
       const data = await res.json();
@@ -196,42 +222,39 @@ export default function ScoreEntry() {
         const gameId = data.gameId;
         setMessage(`Game recorded! ID: ${gameId}`);
 
-        // Prepare result text for display and clipboard
+        // Prepare result text using names
         const resultText = seats
           .map(
             (seat) =>
-              `${flatPlayers[seat] || "Empty"} : ${adjustedScores[seat]}`
+              `${sheetPlayersPayload[seat] || "Empty"} : ${adjustedScores[seat]}`
           )
-          .filter(line => !line.startsWith("Empty")) // Don't show empty seats
+          .filter(line => !line.startsWith("Empty"))
           .join("\n");
 
-        setLatestGameResult(resultText); // Set the latest game result to state
+        setLatestGameResult(resultText);
 
-        // Attempt to copy to clipboard
         navigator.clipboard
           .writeText(resultText)
           .then(() => {
-            setMessage(prev => prev + " | Result copied."); // Append confirmation
+            setMessage(prev => prev + " | Result copied.");
           })
           .catch((err) => {
             console.error("Could not copy text: ", err);
-            // Append warning, don't overwrite original success message
             setMessage(prev => prev + " | Couldn't copy result.");
           });
 
-        // 2. Trigger Settle Up integration (only after successful sheet submission)
+        // --- MODIFIED: Trigger Settle Up using the original players state (with objects) ---
         await triggerSettleUpIntegration({
            gameId: gameId,
-           scores: adjustedScores, // Send the final scores
-           players: flatPlayers // Send the player names (or joined names)
+           scores: adjustedScores,
+           players: players // Send the state containing player objects { name, settleUpMemberId }
         });
+        // --- END MODIFIED ---
 
-
-        // Reset form only after everything succeeds (or partially succeeds)
+        // Reset form
         setPlayers({ East: [], South: [], West: [], North: [] });
         setColorCounts({ East: { Red: 0, Blue: 0, Green: 0, White: 0 }, South: { Red: 0, Blue: 0, Green: 0, White: 0 }, West: { Red: 0, Blue: 0, Green: 0, White: 0 }, North: { Red: 0, Blue: 0, Green: 0, White: 0 } });
         setScores({ East: -200, South: -200, West: -200, North: -200 });
-        // setSumOfScores(-800); // This will recalculate automatically via useEffect
 
       } else {
         setError(data.error || "Error submitting game to sheet.");
@@ -240,39 +263,38 @@ export default function ScoreEntry() {
       setError("Failed to submit to sheet. Check console.");
       console.error(err);
     } finally {
-      setIsSubmitting(false); // Re-enable button
+      setIsSubmitting(false);
     }
   };
 
-  // Function to check if a player is selected in another seat
-  const isPlayerSelectedElsewhere = (seat, playerName) => {
+  // --- MODIFIED: Check based on player ID ---
+  const isPlayerSelectedElsewhere = (seat, playerObject) => {
     for (const otherSeat in players) {
-      if (otherSeat !== seat && players[otherSeat].includes(playerName)) {
+      if (otherSeat !== seat && players[otherSeat].some(p => p.settleUpMemberId === playerObject.settleUpMemberId)) {
         return true;
       }
     }
     return false;
   };
 
-  // Function to get players available for a specific seat
   const getAvailablePlayersForSeat = (currentSeat) => {
-    return availablePlayers.filter(player => !isPlayerSelectedElsewhere(currentSeat, player.name));
+    // Filter availablePlayers based on whether their ID is selected elsewhere
+    return availablePlayers.filter(player => !isPlayerSelectedElsewhere(currentSeat, player));
   };
+  // --- END MODIFIED ---
 
-  // Disable submit button if sum is not 0 or if any seat has players but default score
   const isSubmitDisabled = () => {
      if (isSubmitting) return true;
      if (Math.abs(sumOfScores) > 0.01) return true;
      const activeSeatsCount = seats.filter(s => players[s].length > 0 && scores[s] !== -200).length;
-     if (activeSeatsCount < 2) return true; // Need at least 2 active seats
+     if (activeSeatsCount < 2) return true;
      const invalidScoreSeats = seats.filter(s => players[s].length > 0 && scores[s] === -200).length;
-     if (invalidScoreSeats > 0) return true; // Seats with players must have scores entered
-
+     if (invalidScoreSeats > 0) return true;
      return false;
   }
 
 
-  if (isAdmin === null) return <div>Loading...</div>; // Show loading state
+  if (isAdmin === null) return <div>Loading...</div>;
 
   return (
     <Layout>
@@ -282,26 +304,30 @@ export default function ScoreEntry() {
         <div key={seat} className="mb-6 p-4 border rounded bg-gray-50">
           <label className="block font-semibold text-lg mb-2">{seat} Players</label>
           <div className="flex flex-wrap gap-2 mb-3">
+            {/* --- MODIFIED: Iterate available players and pass object to handler --- */}
             {getAvailablePlayersForSeat(seat).map((player) => (
               <button
-                key={player.id}
-                onClick={() => handlePlayerSelect(seat, player.name)}
+                key={player.settleUpMemberId} // Use ID as key
+                onClick={() => handlePlayerSelect(seat, player)} // Pass the whole object
                 className={`px-2 py-1 rounded text-xs mt-1 mb-1 text-center whitespace-nowrap transition-colors duration-150 ${
-                  players[seat].includes(player.name)
-                    ? "bg-blue-600 text-white ring-2 ring-blue-300" // Highlight selected
+                  // Check if player ID is in the selected list for the seat
+                  players[seat].some(p => p.settleUpMemberId === player.settleUpMemberId)
+                    ? "bg-blue-600 text-white ring-2 ring-blue-300"
                     : "bg-gray-200 hover:bg-gray-300 text-black"
-                } ${players[seat].length >= MAX_PLAYERS_PER_SEAT && !players[seat].includes(player.name) ? "opacity-50 cursor-not-allowed" : ""}`} // Dim if seat is full
-                disabled={players[seat].length >= MAX_PLAYERS_PER_SEAT && !players[seat].includes(player.name)}
-                style={{ minWidth: "5ch" }} // Slightly wider buttons
+                } ${players[seat].length >= MAX_PLAYERS_PER_SEAT && !players[seat].some(p => p.settleUpMemberId === player.settleUpMemberId) ? "opacity-50 cursor-not-allowed" : ""}`}
+                disabled={players[seat].length >= MAX_PLAYERS_PER_SEAT && !players[seat].some(p => p.settleUpMemberId === player.settleUpMemberId)}
+                style={{ minWidth: "5ch" }}
               >
-                {player.name}
+                {player.name} {/* Display name */}
               </button>
             ))}
+             {/* --- END MODIFIED --- */}
              {players[seat].length === 0 && <span className="text-xs text-gray-500 italic">Select player(s)</span>}
           </div>
 
+          {/* Color selection remains the same */}
           <label className="block font-semibold text-lg mb-2">{seat} Colors</label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-2"> {/* Responsive grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-2">
             {colors.map((color) => (
               <div key={color} className="flex flex-col items-center p-2 bg-white rounded shadow-sm">
                 <label className="mb-1 font-medium text-sm">{color} ({colorValues[color]})</label>
@@ -309,13 +335,13 @@ export default function ScoreEntry() {
                   <button
                     onClick={() => handleColorChange(seat, color, -1)}
                     className="px-3 py-1 rounded-l bg-red-200 hover:bg-red-300 text-red-800 font-bold disabled:opacity-50"
-                    disabled={colorCounts[seat][color] <= 0} // Disable if count is 0
+                    disabled={colorCounts[seat][color] <= 0}
                   >
                     -
                   </button>
                   <div
-                    className="px-2 py-1 text-center mx-0 bg-gray-100 font-mono text-sm" // Use mono font for numbers
-                    style={{ width: `${INPUT_WIDTH_CH + 1}ch`, minWidth: `${INPUT_WIDTH_CH + 1}ch` }} // Ensure width
+                    className="px-2 py-1 text-center mx-0 bg-gray-100 font-mono text-sm"
+                    style={{ width: `${INPUT_WIDTH_CH + 1}ch`, minWidth: `${INPUT_WIDTH_CH + 1}ch` }}
                   >
                     {colorCounts[seat][color] || 0}
                   </div>
@@ -335,6 +361,7 @@ export default function ScoreEntry() {
         </div>
       ))}
 
+      {/* Submit section remains mostly the same */}
       <div className="mt-4 p-4 border rounded bg-gray-100 sticky bottom-0">
         <p className={`text-lg font-bold mb-2 ${Math.abs(sumOfScores) > 0.01 ? 'text-red-500 animate-pulse' : 'text-green-600'}`}>
             Sum of Scores: {sumOfScores} {Math.abs(sumOfScores) > 0.01 ? '(Must be 0!)' : '(OK)'}
@@ -351,8 +378,7 @@ export default function ScoreEntry() {
         </button>
       </div>
 
-
-      {/* Display the latest game result */}
+      {/* Display result section remains the same */}
       {latestGameResult && (
         <div className="mt-8 p-4 bg-white rounded-md shadow border border-gray-200">
           <h2 className="text-lg font-semibold mb-2 text-gray-800">Latest Game Result</h2>
