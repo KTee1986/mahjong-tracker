@@ -1,30 +1,10 @@
 // pages/api/get-settleup-user-groups.js
 
-// --- Use require to import the helper functions ---
-let loginSettleUp, getUserGroupIds, getGroupDetails;
-try {
-    const settleUpApi = require('../../lib/settleup-api');
-    loginSettleUp = settleUpApi.loginSettleUp;
-    getUserGroupIds = settleUpApi.getUserGroupIds;
-    getGroupDetails = settleUpApi.getGroupDetails;
-    if (!loginSettleUp || !getUserGroupIds || !getGroupDetails) {
-        throw new Error("One or more functions missing from settleup-api module.");
-    }
-} catch (e) {
-    console.error("FATAL: Failed to require settleup-api module.", e);
-    // If the helper module itself fails to load, the API route cannot function.
-    // Send a 500 error immediately.
-    // Note: This specific response might not be reachable if the process exits during require.
-    module.exports = async (req, res) => {
-        res.status(500).json({ error: "Internal server error: Failed to load core API library." });
-    };
-    // Re-throw the error to ensure the process logs it clearly if possible
-    throw e;
-}
+// --- Use import for the helper functions (ES Module style) ---
+import { loginSettleUp, getUserGroupIds, getGroupDetails } from '../../lib/settleup-api';
 
-
-// Define the main handler function using module.exports for consistency with require
-module.exports = async (req, res) => {
+// Define the main handler function using standard export default
+export default async function handler(req, res) {
     // Ensure this is a POST request
     if (req.method !== 'POST') {
         res.setHeader('Allow', ['POST']);
@@ -43,6 +23,7 @@ module.exports = async (req, res) => {
 
     try {
         // --- Step 1: Log in to Settle Up ---
+        // Uses the v9 modular functions imported from the lib
         const loginResult = await loginSettleUp(email, password);
         uid = loginResult.uid;
         token = loginResult.token;
@@ -60,7 +41,7 @@ module.exports = async (req, res) => {
 
         // --- Step 3: Fetch details (specifically the name) for each group ---
         const groupDetailsPromises = groupIds.map(id =>
-            getGroupDetails(id, token) // Error handling is now inside getGroupDetails
+            getGroupDetails(id, token) // Error handling is inside getGroupDetails
         );
 
         const groupDetailsResults = await Promise.all(groupDetailsPromises);
@@ -68,18 +49,17 @@ module.exports = async (req, res) => {
         // --- Step 4: Format the response ---
         const groups = groupDetailsResults
             .map((details, index) => {
-                // Filter out null results (groups that failed to fetch or had no name)
+                // Filter out null results (groups that failed, had no details, or no name)
                 if (details && details.name) {
                     return {
                         id: groupIds[index],
                         name: details.name,
                     };
                 }
-                // Log if details were fetched but name was missing
                 if (details && !details.name) {
                      console.warn(`Group ${groupIds[index]} fetched but missing 'name' property.`);
                 }
-                return null; // Exclude groups that failed, had no details, or no name
+                return null;
             })
             .filter(group => group !== null);
 
@@ -89,19 +69,21 @@ module.exports = async (req, res) => {
     } catch (error) {
         console.error("API Error in /api/get-settleup-user-groups:", error.message);
 
+        // Handle specific errors thrown from the lib functions
         if (error.message.includes("Invalid Settle Up email or password")) {
             return res.status(401).json({ error: error.message });
         }
         if (error.message.includes("Authentication error") || error.message.includes("authentication failed")) {
              return res.status(403).json({ error: "Settle Up authentication or authorization failed." });
         }
-        if (error.message.includes("Failed to initialize Firebase") || error.message.includes("Firebase SDK was not loaded")) {
-             return res.status(500).json({ error: "Internal server error: Firebase initialization failed." });
+         // Handle initialization errors
+        if (error.message.includes("Failed to initialize Firebase") || error.message.includes("Firebase Auth service not available")) {
+             return res.status(500).json({ error: "Internal server error: Firebase service initialization failed." });
         }
          if (error.message.includes("Firebase configuration is incomplete")) {
              return res.status(500).json({ error: "Internal server error: Firebase configuration missing." });
         }
-        // Generic server error
+        // Generic server error for other issues (e.g., REST API fetch failures)
         return res.status(500).json({ error: "An internal server error occurred while fetching groups." });
     }
-};
+}
