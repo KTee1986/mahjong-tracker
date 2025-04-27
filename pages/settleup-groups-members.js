@@ -1,26 +1,25 @@
 // pages/settleup-groups-members.js (Using Backend Authentication)
-import { useState, useEffect } from "react"; // Added useEffect
+import { useState, useEffect } from "react";
 import Layout from "../components/Layout"; // Assuming you have a Layout component
-import { useRouter } from "next/router"; // Import useRouter for potential redirects
+import { useRouter } from "next/router";
 
 export default function SettleUpGroupsAndMembers() {
   // Removed email and password state
-  const router = useRouter(); // Initialize router
+  const router = useRouter();
 
   // State for API interaction
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState(""); // Added message state for feedback
+  const [message, setMessage] = useState("");
 
   // State to store the fetched data
   const [groupData, setGroupData] = useState(null);
 
-  // Optional: Add authentication check if this page requires login to your app
+  // Optional: Add authentication check for your own application if needed
   // useEffect(() => {
-  //   // Example: Check if user is logged into *your* application
-  //   const loggedIn = sessionStorage.getItem("isLoggedIn"); // Or your auth method
+  //   const loggedIn = sessionStorage.getItem("isLoggedIn");
   //   if (loggedIn !== "true") {
-  //     router.replace("/login"); // Redirect to your app's login if needed
+  //     router.replace("/login");
   //   }
   // }, [router]);
 
@@ -28,43 +27,37 @@ export default function SettleUpGroupsAndMembers() {
    * Handles fetching the groups and members using backend credentials.
    */
   const handleFetchData = async () => {
-    // No event needed as it's triggered by a button, not form submit
     setIsLoading(true);
     setError("");
-    setMessage(""); // Clear previous messages
-    setGroupData(null); // Reset previous results
+    setMessage("");
+    setGroupData(null);
 
     try {
-      // Call the backend endpoint. No body needed as auth uses env vars.
+      // Call the backend endpoint. No body needed.
       const res = await fetch('/api/get-settleup-groups-and-members', {
-        method: 'POST', // Still POST to trigger the serverless function easily
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // No Authorization header needed here if your API route is protected differently
-          // or if it's intended to be called by authenticated users of your app.
         },
-        // No body needed as backend uses environment variables for SettleUp auth
+        // No body - backend uses environment variables
       });
 
       const data = await res.json();
 
-      // Handle non-OK responses (e.g., 401, 403, 500)
       if (!res.ok) {
         throw new Error(data.error || `Error: ${res.status} ${res.statusText}`);
       }
 
-      // Validate the structure of the successful response
       if (!data || !Array.isArray(data.groupsWithMembers)) {
           console.error("Unexpected response format. Expected { groupsWithMembers: [...] }", data);
           throw new Error("Received unexpected data format from the server.");
       }
 
-      // Store the fetched data
       setGroupData(data.groupsWithMembers);
       if (data.groupsWithMembers.length === 0) {
         setMessage("No Settle Up groups found for the configured backend account.");
       } else {
-         setMessage("Data fetched successfully."); // Provide success feedback
+         setMessage("Data fetched successfully.");
       }
 
     } catch (err) {
@@ -77,10 +70,8 @@ export default function SettleUpGroupsAndMembers() {
 
   /**
    * Renders the table for members of a single group.
-   * @param {Array} members - Array of member objects for the group.
    */
   const renderMemberTable = (members) => {
-    // Same as before...
     if (!members || members.length === 0) {
       return <p className="italic text-sm text-gray-500 px-4">No members found for this group.</p>;
     }
@@ -129,17 +120,16 @@ export default function SettleUpGroupsAndMembers() {
         Click the button below to fetch group and member data using the pre-configured backend Settle Up account.
       </p>
 
-      {/* Removed the form, replaced with a simple button */}
+      {/* Button to trigger fetch */}
       <div className="mb-8 max-w-md">
         <button
-          onClick={handleFetchData} // Call the fetch function directly
+          onClick={handleFetchData}
           disabled={isLoading}
           className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading ? "Fetching Data..." : "Fetch Settle Up Data"}
         </button>
       </div>
-
 
       {/* Loading State */}
       {isLoading && (
@@ -162,7 +152,6 @@ export default function SettleUpGroupsAndMembers() {
         </div>
       )}
 
-
       {/* Results Display */}
       {groupData && !isLoading && (
         <div className="mt-6 space-y-6">
@@ -181,7 +170,6 @@ export default function SettleUpGroupsAndMembers() {
               </div>
             ))
           ) : (
-            // Message state now handles the "no groups found" case
             !message && <p className="italic text-gray-500">No group data loaded.</p>
           )}
         </div>
