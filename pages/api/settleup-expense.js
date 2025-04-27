@@ -3,7 +3,6 @@
 import {
     loginSettleUpBackend,
     createSettleUpExpense
-    // Removed getGroupMembers, findMemberIdByName imports
 } from '../../lib/settleup-api';
 
 // Helper function to get current timestamp
@@ -29,12 +28,19 @@ export default async function handler(req, res) {
          return res.status(400).json({ error: 'Scores and players objects cannot be empty.' });
      }
 
-    // Get target group ID from environment
+    // Get target group ID and backend email from environment
     const groupId = process.env.SETTLEUP_GROUP_ID;
+    const backendEmail = process.env.SETTLEUP_BACKEND_EMAIL; // Get email for potential error logging
+
     if (!groupId) {
         console.error("Environment variable SETTLEUP_GROUP_ID is not set.");
         return res.status(500).json({ error: 'SettleUp group ID configuration missing on server.' });
     }
+     // Check if email is configured (needed for login)
+     if (!backendEmail) {
+         console.error("Environment variable SETTLEUP_BACKEND_EMAIL is not set.");
+         return res.status(500).json({ error: 'SettleUp backend email configuration missing on server.' });
+     }
     console.log(`SettleUp Expense API: Using target group ID from env: ${groupId}`);
 
     let token;
@@ -42,7 +48,7 @@ export default async function handler(req, res) {
     try {
         // --- Step 1: Log in using backend credentials ---
         console.log("SettleUp Expense API: Logging in with backend credentials...");
-        const loginResult = await loginSettleUpBackend();
+        const loginResult = await loginSettleUpBackend(); // Uses env vars internally
         token = loginResult.token;
         console.log("SettleUp Expense API: Backend login successful.");
 
@@ -147,13 +153,11 @@ export default async function handler(req, res) {
              return res.status(200).json({ message: "Game recorded to sheet, SettleUp expense skipped (no non-zero participants)." });
         }
 
-        // --- Step 4: Log the payload and Create the Expense --- // <--- MOVED STEP NUMBERING FOR CLARITY
-
-        // *** ADDED LOGGING HERE ***
+        // --- Step 4: Log the payload and Create the Expense ---
         console.log("SettleUp Expense API: Payload to be sent:", JSON.stringify(expensePayload, null, 2)); // Pretty print JSON
 
         console.log("SettleUp Expense API: Calling createSettleUpExpense...");
-        const creationResult = await createSettleUpExpense(groupId, token, expensePayload); // Use groupId from env
+        const creationResult = await createSettleUpExpense(groupId, token, expensePayload);
 
         // --- Step 5: Return Success Response ---
         console.log("SettleUp Expense API: Expense creation successful.");
@@ -163,19 +167,26 @@ export default async function handler(req, res) {
         });
 
     } catch (error) {
-        console.error("SettleUp Expense API Error:", error.message);
+        // *** MODIFIED: Added backendEmail to the error log ***
+        console.error(`SettleUp Expense API Error (User: ${backendEmail || 'Not Configured'}):`, error.message);
+        // *** END MODIFIED ***
+
         let statusCode = 500;
-        if (error.message.includes("Invalid backend Settle Up email or password") || error.message.includes("Authentication error")) {
-            statusCode = 500;
+        // Determine status code based on error message
+        if (error.message.includes("Invalid backend Settle Up email or password") || error.message.includes("Authentication error") || error.message.includes("Backend SettleUp credentials missing")) {
+             statusCode = 500; // Indicate server config/auth issue
         } else if (error.message.includes("Could not fetch") || error.message.includes("not found")) {
-            statusCode = 404;
+             statusCode = 404;
         } else if (error.message.includes("Failed to create Settle Up expense")) {
-             statusCode = 502;
+             statusCode = 502; // Error communicating with SettleUp
         } else if (error.message.includes("Data mapping failed")) {
              statusCode = 400;
         } else if (error.message.includes("calculation error")) {
-            statusCode = 500;
+             statusCode = 500;
+        } else if (error.message.includes("configuration missing")) {
+            statusCode = 500; // Explicitly handle config errors caught earlier
         }
+
         return res.status(statusCode).json({ error: error.message || "An internal server error occurred during SettleUp expense creation." });
     }
 }
