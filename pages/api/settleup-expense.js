@@ -51,9 +51,8 @@ export default async function handler(req, res) {
         const aggregatedScores = {}; // Store { settleUpMemberId: totalScore }
         const mappingErrors = [];
 
-        // Iterate through the seats
         for (const seat in players) {
-            const seatPlayers = players[seat]; // Array of { name, settleUpMemberId }
+            const seatPlayers = players[seat];
             const seatScore = scores[seat];
 
             if (!Array.isArray(seatPlayers)) {
@@ -61,35 +60,31 @@ export default async function handler(req, res) {
                 continue;
             }
 
-            // Iterate through player objects in the seat
             for (const playerObj of seatPlayers) {
                 const memberId = playerObj?.settleUpMemberId;
                 const playerName = playerObj?.name || '(Unknown Name)';
 
                 if (!memberId) {
                     mappingErrors.push(`Missing SettleUp Member ID for player "${playerName}" in seat ${seat}.`);
-                    continue; // Skip this player if ID is missing
+                    continue;
                 }
 
-                // Add the seat's score to the total for this memberId
                 if (aggregatedScores.hasOwnProperty(memberId)) {
                     aggregatedScores[memberId] += seatScore;
                 } else {
                     aggregatedScores[memberId] = seatScore;
                 }
-                 // Round intermediate sums to avoid floating point issues
                  aggregatedScores[memberId] = roundToTwoDecimals(aggregatedScores[memberId]);
             }
         }
 
-        // If any essential data was missing
         if (mappingErrors.length > 0) {
             console.error("SettleUp Expense API: Player ID mapping errors:", mappingErrors);
             return res.status(400).json({ error: `Data mapping failed: ${mappingErrors.join(' ')}` });
         }
         console.log("SettleUp Expense API: Aggregated scores by Member ID:", aggregatedScores);
 
-        // --- Step 3: Construct the SettleUp Expense Payload using aggregated scores ---
+        // --- Step 3: Construct the SettleUp Expense Payload ---
         console.log("SettleUp Expense API: Constructing expense payload...");
         const expensePayload = {
             purpose: `Game Score Entry (ID: ${gameId})`,
@@ -102,13 +97,11 @@ export default async function handler(req, res) {
 
         let totalPositive = 0;
         let totalNegative = 0;
-        const creditors = []; // { memberId: amount }
-        const debtors = [];   // { memberId: amount }
+        const creditors = [];
+        const debtors = [];
 
-        // Use the aggregated scores now
         for (const memberId in aggregatedScores) {
             const totalScoreForMember = aggregatedScores[memberId];
-            // Round final score before comparison/use
             const roundedScore = roundToTwoDecimals(totalScoreForMember);
 
             if (roundedScore > 0) {
@@ -118,28 +111,20 @@ export default async function handler(req, res) {
                 totalNegative += roundedScore;
                 debtors.push({ memberId: memberId, amount: roundedScore });
             }
-            // Ignore member IDs with a final aggregated score of 0
         }
-         // Round totals as well
          totalPositive = roundToTwoDecimals(totalPositive);
          totalNegative = roundToTwoDecimals(totalNegative);
 
-        // Basic validation: total aggregated score should be (close to) zero
         if (Math.abs(totalPositive + totalNegative) > 0.01) {
-             // This error is more likely due to rounding issues if individual scores summed to 0
              console.error(`Internal calculation error: Aggregated scores do not sum to zero (${totalPositive + totalNegative}). Check rounding or input scores.`);
              throw new Error(`Internal calculation error: Aggregated scores do not sum to zero (${roundToTwoDecimals(totalPositive + totalNegative)}). Cannot create balanced expense.`);
         }
 
         // Define Payer(s) and Participants (ASSUMPTION - TEST THIS with SettleUp API)
         if (creditors.length > 0) {
-             // Let the first creditor pay the total positive amount
              expensePayload.whoPaid.push({ memberId: creditors[0].memberId, amount: totalPositive });
-
-             // Define participants using the aggregated scores
              for (const memberId in aggregatedScores) {
                  const finalScore = roundToTwoDecimals(aggregatedScores[memberId]);
-                 // Only include participants whose final score isn't zero
                  if (Math.abs(finalScore) > 0.01) {
                      expensePayload.participants.push({
                          memberId: memberId,
@@ -148,7 +133,6 @@ export default async function handler(req, res) {
                  }
              }
         } else {
-            // Handle cases where only debtors exist or all scores are zero
             if (debtors.length > 0) {
                  console.warn("SettleUp Expense API: Only debtors found after aggregation, cannot create expense with the current payer model.");
                  return res.status(200).json({ message: "Game recorded to sheet, but SettleUp expense skipped (no creditors after aggregation)." });
@@ -158,16 +142,18 @@ export default async function handler(req, res) {
             }
         }
 
-        // Ensure there are participants if we are creating an expense
         if (expensePayload.participants.length === 0 && expensePayload.whoPaid.length > 0) {
              console.warn("SettleUp Expense API: Expense has a payer but no participants after filtering zero scores. Skipping creation.");
              return res.status(200).json({ message: "Game recorded to sheet, SettleUp expense skipped (no non-zero participants)." });
         }
 
+        // --- Step 4: Log the payload and Create the Expense --- // <--- MOVED STEP NUMBERING FOR CLARITY
 
-        // --- Step 4: Create the Expense in Settle Up ---
+        // *** ADDED LOGGING HERE ***
+        console.log("SettleUp Expense API: Payload to be sent:", JSON.stringify(expensePayload, null, 2)); // Pretty print JSON
+
         console.log("SettleUp Expense API: Calling createSettleUpExpense...");
-        const creationResult = await createSettleUpExpense(groupId, token, expensePayload);
+        const creationResult = await createSettleUpExpense(groupId, token, expensePayload); // Use groupId from env
 
         // --- Step 5: Return Success Response ---
         console.log("SettleUp Expense API: Expense creation successful.");
@@ -188,7 +174,7 @@ export default async function handler(req, res) {
         } else if (error.message.includes("Data mapping failed")) {
              statusCode = 400;
         } else if (error.message.includes("calculation error")) {
-            statusCode = 500; // Internal calculation issue
+            statusCode = 500;
         }
         return res.status(statusCode).json({ error: error.message || "An internal server error occurred during SettleUp expense creation." });
     }
