@@ -11,33 +11,10 @@ const INPUT_WIDTH_CH = 3;
 export default function ScoreEntry() {
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(null);
-
-  // --- MODIFIED: Store array of player objects { name, settleUpMemberId } per seat ---
-  const [players, setPlayers] = useState({
-    East: [],
-    South: [],
-    West: [],
-    North: [],
-  });
-  // --- END MODIFIED ---
-
-  const [colorCounts, setColorCounts] = useState({
-    East: { Red: 0, Blue: 0, Green: 0, White: 0 },
-    South: { Red: 0, Blue: 0, Green: 0, White: 0 },
-    West: { Red: 0, Blue: 0, Green: 0, White: 0 },
-    North: { Red: 0, Blue: 0, Green: 0, White: 0 },
-  });
-  const [scores, setScores] = useState({
-    East: -200,
-    South: -200,
-    West: -200,
-    North: -200,
-  });
-
-  // --- MODIFIED: Expect players with { name, settleUpMemberId } ---
-  const [availablePlayers, setAvailablePlayers] = useState([]); // Array of { name, settleUpMemberId }
-  // --- END MODIFIED ---
-
+  const [players, setPlayers] = useState({ East: [], South: [], West: [], North: [] });
+  const [colorCounts, setColorCounts] = useState({ East: { Red: 0, Blue: 0, Green: 0, White: 0 }, South: { Red: 0, Blue: 0, Green: 0, White: 0 }, West: { Red: 0, Blue: 0, Green: 0, White: 0 }, North: { Red: 0, Blue: 0, Green: 0, White: 0 } });
+  const [scores, setScores] = useState({ East: -200, South: -200, West: -200, North: -200 });
+  const [availablePlayers, setAvailablePlayers] = useState([]); // Array of UNIQUE { name, settleUpMemberId }
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [sumOfScores, setSumOfScores] = useState(-800);
@@ -50,50 +27,61 @@ export default function ScoreEntry() {
     else setIsAdmin(true);
   }, [router]);
 
+  // Fetch and De-duplicate Players
   useEffect(() => {
-    // --- MODIFIED: Fetch players, expecting settleUpMemberId ---
-    fetch("/api/players") // Ensure this API returns [{ name, settleUpMemberId }, ...]
+    fetch("/api/players")
       .then((res) => {
           if (!res.ok) throw new Error(`Failed to fetch players: ${res.statusText}`);
           return res.json();
       })
       .then(({ data }) => {
-        // Validate data structure
-        if (!Array.isArray(data) || (data.length > 0 && (!data[0].name || !data[0].settleUpMemberId))) {
-            console.error("Invalid player data received:", data);
-            setError("Error: Invalid player data format received from API. Expected [{ name, settleUpMemberId }, ...]");
-            setAvailablePlayers([]); // Set to empty array on error
-        } else {
-            setAvailablePlayers(data);
+        if (!Array.isArray(data)) {
+             console.error("Invalid player data received (not an array):", data);
+             setError("Error: Invalid player data format received from API.");
+             setAvailablePlayers([]);
+             return;
         }
+
+        // De-duplication logic
+        const uniquePlayersMap = new Map();
+        data.forEach(player => {
+            if (player && player.settleUpMemberId && player.name) {
+                if (!uniquePlayersMap.has(player.settleUpMemberId)) {
+                    uniquePlayersMap.set(player.settleUpMemberId, player);
+                }
+            } else {
+                 console.warn("Skipping invalid player entry:", player);
+            }
+        });
+        const uniquePlayerList = Array.from(uniquePlayersMap.values());
+
+        console.log("Unique players list fetched and set:", uniquePlayerList);
+        setAvailablePlayers(uniquePlayerList);
+
       })
       .catch((err) => {
-        setError("Error fetching players. Ensure /api/players returns correct data including 'settleUpMemberId'.");
+        setError("Error fetching or processing players. Ensure /api/players returns correct data including 'settleUpMemberId'.");
         console.error(err);
-         setAvailablePlayers([]); // Set to empty array on fetch error
+         setAvailablePlayers([]);
       });
-     // --- END MODIFIED ---
   }, []);
+  // End Fetch and De-duplicate
 
-  // --- MODIFIED: Handle player OBJECT selection ---
   const handlePlayerSelect = (seat, playerObject) => {
     setPlayers((prevPlayers) => {
       const newPlayers = { ...prevPlayers };
-      const seatPlayers = newPlayers[seat]; // Array of player objects
+      const seatPlayers = newPlayers[seat];
       const isSelected = seatPlayers.some(p => p.settleUpMemberId === playerObject.settleUpMemberId);
 
       if (isSelected) {
-        // Deselect player by filtering based on ID
         newPlayers[seat] = seatPlayers.filter((p) => p.settleUpMemberId !== playerObject.settleUpMemberId);
       } else if (seatPlayers.length < MAX_PLAYERS_PER_SEAT) {
-        // Select player object if not full
         newPlayers[seat] = [...seatPlayers, playerObject];
       }
-      // No change if seat is full and player wasn't selected
+      console.log("Players state updated:", newPlayers); // Log state change
       return newPlayers;
     });
   };
-  // --- END MODIFIED ---
 
   const calculateScore = useCallback((seat, counts) => {
     let total = 0;
@@ -123,7 +111,7 @@ export default function ScoreEntry() {
     setSumOfScores(parseFloat(newSum.toFixed(1)));
   }, [scores]);
 
-  // --- MODIFIED: Send structured player data to Settle Up API ---
+
   const triggerSettleUpIntegration = async (gameData) => {
     setMessage(prev => prev + " | Attempting Settle Up sync...");
     try {
@@ -132,10 +120,8 @@ export default function ScoreEntry() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           gameId: gameData.gameId,
-          scores: gameData.scores, // Send scores as before { East: 100, ... }
-          // Send the structured players state directly
-          // Backend will extract settleUpMemberId
-          players: gameData.players, // Send { East: [{ name, id }, ...], ... }
+          scores: gameData.scores,
+          players: gameData.players,
         }),
       });
 
@@ -154,7 +140,6 @@ export default function ScoreEntry() {
       setMessage(prev => prev.replace(" | Attempting Settle Up sync...", ""));
     }
   }
-  // --- END MODIFIED ---
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
@@ -171,7 +156,7 @@ export default function ScoreEntry() {
 
     const filledSeatsData = seats.map(seat => ({
         seat,
-        players: players[seat], // Array of player objects
+        players: players[seat],
         score: scores[seat]
     }));
 
@@ -194,13 +179,11 @@ export default function ScoreEntry() {
         return;
     }
 
-    // --- MODIFIED: Prepare data for Sheet API (needs names) ---
+    // Prepare data for Sheet API (needs names)
     const sheetPlayersPayload = {};
     for (const seat of seats) {
-        // Extract names from player objects and join them
         sheetPlayersPayload[seat] = players[seat].map(p => p.name).join(" + ");
     }
-    // --- END MODIFIED ---
 
     const adjustedScores = {};
     for (const seat of seats) {
@@ -208,11 +191,10 @@ export default function ScoreEntry() {
     }
 
     try {
-      // 1. Submit to Google Sheet (using names)
+      // 1. Submit to Google Sheet
       const res = await fetch("/api/sheet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Send payload with joined names
         body: JSON.stringify({ players: sheetPlayersPayload, scores: adjustedScores }),
       });
 
@@ -222,7 +204,6 @@ export default function ScoreEntry() {
         const gameId = data.gameId;
         setMessage(`Game recorded! ID: ${gameId}`);
 
-        // Prepare result text using names
         const resultText = seats
           .map(
             (seat) =>
@@ -243,13 +224,12 @@ export default function ScoreEntry() {
             setMessage(prev => prev + " | Couldn't copy result.");
           });
 
-        // --- MODIFIED: Trigger Settle Up using the original players state (with objects) ---
+        // 2. Trigger Settle Up
         await triggerSettleUpIntegration({
            gameId: gameId,
            scores: adjustedScores,
-           players: players // Send the state containing player objects { name, settleUpMemberId }
+           players: players
         });
-        // --- END MODIFIED ---
 
         // Reset form
         setPlayers({ East: [], South: [], West: [], North: [] });
@@ -267,21 +247,34 @@ export default function ScoreEntry() {
     }
   };
 
-  // --- MODIFIED: Check based on player ID ---
-  const isPlayerSelectedElsewhere = (seat, playerObject) => {
+  // Checks if a player (by ID) is selected in any seat OTHER than the current one
+  const isPlayerSelectedElsewhere = (currentSeat, playerObject) => {
     for (const otherSeat in players) {
-      if (otherSeat !== seat && players[otherSeat].some(p => p.settleUpMemberId === playerObject.settleUpMemberId)) {
-        return true;
+      if (otherSeat !== currentSeat) { // Only check other seats
+        if (players[otherSeat].some(p => p.settleUpMemberId === playerObject.settleUpMemberId)) {
+          return true; // Found in another seat
+        }
       }
     }
-    return false;
+    return false; // Not found in any other seat
   };
 
+  // --- MODIFIED: Added logging to this function ---
+  // Gets the list of players available for selection in a specific seat
   const getAvailablePlayersForSeat = (currentSeat) => {
-    // Filter availablePlayers based on whether their ID is selected elsewhere
-    return availablePlayers.filter(player => !isPlayerSelectedElsewhere(currentSeat, player));
+    // Start with the full unique list of players
+    const available = availablePlayers.filter(player => {
+        // Check if this player is selected in any *other* seat
+        const isElsewhere = isPlayerSelectedElsewhere(currentSeat, player);
+        // Keep the player only if they are NOT selected elsewhere
+        return !isElsewhere;
+    });
+    // Log the result of filtering for debugging
+    // console.log(`Players available for seat ${currentSeat}:`, available.map(p => `${p.name} (${p.settleUpMemberId})`));
+    return available;
   };
   // --- END MODIFIED ---
+
 
   const isSubmitDisabled = () => {
      if (isSubmitting) return true;
@@ -304,13 +297,12 @@ export default function ScoreEntry() {
         <div key={seat} className="mb-6 p-4 border rounded bg-gray-50">
           <label className="block font-semibold text-lg mb-2">{seat} Players</label>
           <div className="flex flex-wrap gap-2 mb-3">
-            {/* --- MODIFIED: Iterate available players and pass object to handler --- */}
+            {/* Render buttons using the filtered list */}
             {getAvailablePlayersForSeat(seat).map((player) => (
               <button
-                key={player.settleUpMemberId} // Use ID as key
-                onClick={() => handlePlayerSelect(seat, player)} // Pass the whole object
+                key={player.settleUpMemberId}
+                onClick={() => handlePlayerSelect(seat, player)}
                 className={`px-2 py-1 rounded text-xs mt-1 mb-1 text-center whitespace-nowrap transition-colors duration-150 ${
-                  // Check if player ID is in the selected list for the seat
                   players[seat].some(p => p.settleUpMemberId === player.settleUpMemberId)
                     ? "bg-blue-600 text-white ring-2 ring-blue-300"
                     : "bg-gray-200 hover:bg-gray-300 text-black"
@@ -318,14 +310,13 @@ export default function ScoreEntry() {
                 disabled={players[seat].length >= MAX_PLAYERS_PER_SEAT && !players[seat].some(p => p.settleUpMemberId === player.settleUpMemberId)}
                 style={{ minWidth: "5ch" }}
               >
-                {player.name} {/* Display name */}
+                {player.name}
               </button>
             ))}
-             {/* --- END MODIFIED --- */}
              {players[seat].length === 0 && <span className="text-xs text-gray-500 italic">Select player(s)</span>}
           </div>
 
-          {/* Color selection remains the same */}
+          {/* Color selection */}
           <label className="block font-semibold text-lg mb-2">{seat} Colors</label>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-2">
             {colors.map((color) => (
@@ -361,7 +352,7 @@ export default function ScoreEntry() {
         </div>
       ))}
 
-      {/* Submit section remains mostly the same */}
+      {/* Submit section */}
       <div className="mt-4 p-4 border rounded bg-gray-100 sticky bottom-0">
         <p className={`text-lg font-bold mb-2 ${Math.abs(sumOfScores) > 0.01 ? 'text-red-500 animate-pulse' : 'text-green-600'}`}>
             Sum of Scores: {sumOfScores} {Math.abs(sumOfScores) > 0.01 ? '(Must be 0!)' : '(OK)'}
@@ -378,7 +369,7 @@ export default function ScoreEntry() {
         </button>
       </div>
 
-      {/* Display result section remains the same */}
+      {/* Display result section */}
       {latestGameResult && (
         <div className="mt-8 p-4 bg-white rounded-md shadow border border-gray-200">
           <h2 className="text-lg font-semibold mb-2 text-gray-800">Latest Game Result</h2>
