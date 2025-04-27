@@ -1,237 +1,204 @@
-// /pages/api/settleup-expense.js
+// pages/api/settleup-expense.js
 
-import axios from 'axios';
-// Optional Firebase Admin SDK imports
-// import admin from 'firebase-admin';
-// import { initializeFirebaseAdmin } from '../../lib/firebaseAdmin';
-// initializeFirebaseAdmin();
+import {
+    loginSettleUpBackend, // Use the backend login function
+    findGroupIdByName,
+    getGroupMembers,
+    findMemberIdByName,
+    createSettleUpExpense
+} from '../../lib/settleup-api';
 
-// --- Configuration ---
-const SETTLE_UP_API_URL = process.env.NEXT_PUBLIC_SETTLE_UP_ENV === 'production'
-  ? 'https://settle-up-live.firebaseio.com'
-  : 'https://settle-up-sandbox.firebaseio.com';
+// Helper function to get current timestamp in milliseconds
+const getCurrentTimestamp = () => new Date().getTime();
 
-const SETTLE_UP_GROUP_ID = process.env.SETTLE_UP_GROUP_ID;
-const SETTLE_UP_CURRENCY_CODE = process.env.SETTLE_UP_CURRENCY_CODE || 'CAD';
-
-/**
- * Placeholder: Get Firebase ID token (Implement based on your auth setup)
- * @param {import('next').NextApiRequest} req
- * @returns {Promise<string|null>}
- */
-async function getFirebaseIdToken(req) {
-  const authorization = req.headers.authorization;
-  if (authorization && authorization.startsWith('Bearer ')) {
-    const token = authorization.split('Bearer ')[1];
-    // RECOMMENDED: Verify token
-    return token;
-  }
-  console.warn("Firebase ID Token not found in request.");
-  return null;
-}
-
-/**
- * Fetches player data from /api/players and creates a name -> Member ID map.
- * @param {import('next').NextApiRequest} req
- * @returns {Promise<object>} Map { playerName: memberId }
- */
-async function getPlayerToMemberIdMap(req) {
-  const protocol = req.headers['x-forwarded-proto'] || 'http';
-  const host = process.env.VERCEL_URL || req.headers.host;
-  const apiUrl = `${protocol}://${host}/api/players`;
-  console.log(`Fetching player map from internal URL: ${apiUrl}`);
-  try {
-    const response = await fetch(apiUrl);
-    if (!response.ok) throw new Error(`Failed to fetch player list. Status: ${response.status}`);
-    const { data: players } = await response.json();
-    if (!Array.isArray(players)) throw new Error("Invalid player data format.");
-
-    const playerMap = {};
-    players.forEach(player => {
-      if (player.name && player.settleUpMemberId) {
-        playerMap[player.name.trim()] = player.settleUpMemberId.trim();
-      } else {
-        console.warn(`Player data incomplete for ID ${player.id}. Missing name or settleUpMemberId.`);
-      }
-    });
-    console.log(`Successfully built player map with ${Object.keys(playerMap).length} entries.`);
-    return playerMap;
-  } catch (error) {
-    console.error("Error fetching/processing player data for Member ID map:", error);
-    throw new Error(`Could not retrieve player mapping: ${error.message}`);
-  }
-}
-
-// --- API Handler ---
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', ['POST']);
-    return res.status(405).end(`Method ${req.method} Not Allowed`);
-  }
-
-  if (!SETTLE_UP_GROUP_ID) {
-    console.error("SETTLE_UP_GROUP_ID environment variable is not set.");
-    return res.status(500).json({ error: "Server configuration error [SUGI]" });
-  }
-
-  const firebaseIdToken = await getFirebaseIdToken(req);
-  if (!firebaseIdToken) {
-    return res.status(401).json({ error: "Unauthorized: Missing or invalid authentication token." });
-  }
-
-  const { gameId, scores, players } = req.body;
-  if (!scores || !players || typeof scores !== 'object' || typeof players !== 'object') {
-    return res.status(400).json({ error: "Invalid request body: Missing or malformed scores/players data." });
-  }
-
-  try {
-    const memberIdMap = await getPlayerToMemberIdMap(req);
-    if (Object.keys(memberIdMap).length === 0) {
-        return res.status(500).json({ error: "Server configuration error: Could not load player mapping." });
+    if (req.method !== 'POST') {
+        res.setHeader('Allow', ['POST']);
+        return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
     }
 
-    // --- Transaction Logic ---
-    const activePlayers = Object.entries(players)
-        .filter(([seat, name]) => name && name.trim() !== '')
-        .map(([seat, name]) => ({
-            seat: seat,
-            name: name.trim(),
-            score: scores[seat] !== undefined ? parseFloat(scores[seat]) : NaN
-        }))
-        .filter(p => !isNaN(p.score));
+    // --- Get data from frontend request body ---
+    const { gameId, scores, players } = req.body;
 
-    if (activePlayers.length < 2) {
-         return res.status(400).json({ error: "Need at least two active players with valid scores." });
+    // Basic validation of incoming data
+    if (!gameId || !scores || typeof scores !== 'object' || !players || typeof players !== 'object') {
+        return res.status(400).json({ error: 'Missing or invalid game data (gameId, scores, players) in request body.' });
     }
-    // Optional server-side sum check...
-
-    const winners = activePlayers.filter(p => p.score > 0).sort((a, b) => b.score - a.score);
-    const losers = activePlayers.filter(p => p.score < 0).sort((a, b) => a.score - b.score);
-
-    if (winners.length === 0 || losers.length === 0) {
-        console.log(`No clear winner/loser for GameID ${gameId}. No Settle Up transaction created.`);
-        return res.status(200).json({ message: "Scores recorded, but no Settle Up transaction needed." });
-    }
-
-    const mainWinner = winners[0];
-    const totalAmount = mainWinner.score; // Total amount is the winner's score
-
-    // Helper to get Member IDs for a player string (potentially "Alice + Bob")
-    const getMemberIdsForPlayerString = (playerString) => {
-        const names = playerString.split(' + ').map(name => name.trim());
-        const ids = names.map(name => memberIdMap[name]).filter(id => id);
-        if (ids.length < names.length) {
-             console.warn(`Could not find Member IDs for all names in "${playerString}".`);
-        }
-        return ids;
-    };
-
-    // Determine primary payer Member ID (handles multiple winners in a seat mapping to *different* IDs)
-    const payerMemberIds = getMemberIdsForPlayerString(mainWinner.name);
-    if (payerMemberIds.length === 0) {
-        throw new Error(`Could not map winner '${mainWinner.name}' to Settle Up Member ID.`);
-    }
-    const primaryPayerMemberId = payerMemberIds[0]; // Still use the first ID for the main payer seat
-    if (payerMemberIds.length > 1) {
-        console.warn(`Winner seat "${mainWinner.name}" maps to multiple Member IDs. Using primary: ${primaryPayerMemberId}`);
-    }
-
-
-    // --- Aggregate losses per Settle Up Member ID ---
-    const memberIdLosses = new Map(); // Use a Map: { memberId => totalLoss }
-
-    losers.forEach(loser => {
-        const individualNames = loser.name.split(' + ').map(name => name.trim());
-        if (individualNames.length === 0) return; // Skip if name was empty/whitespace
-
-        const lossPerPlayer = loser.score / individualNames.length; // Divide the seat's loss among players in it
-
-        individualNames.forEach(name => {
-            const memberId = memberIdMap[name]; // Get Member ID for this individual name
-            if (memberId) {
-                const currentLoss = memberIdLosses.get(memberId) || 0;
-                // Accumulate the negative score (loss) for this Member ID
-                memberIdLosses.set(memberId, currentLoss + lossPerPlayer);
-            } else {
-                console.error(`Could not find Settle Up Member ID for player name: ${name} in seat ${loser.seat}`);
-                // Decide how to handle missing IDs - skip this player's contribution? Throw error?
-            }
-        });
-    });
-
-
-    if (memberIdLosses.size === 0) {
-        // This could happen if all losers couldn't be mapped to Member IDs
-        throw new Error(`Could not map any losers to Settle Up Member IDs with aggregated losses.`);
-    }
-
-    // --- Create recipientItems from aggregated losses ---
-    const recipientItems = [];
-    let totalAggregatedWeight = 0;
-    for (const [memberId, totalLoss] of memberIdLosses.entries()) {
-         const weight = Math.abs(totalLoss); // Weight is the absolute value of the total loss for this memberId
-         recipientItems.push({
-            memberId: memberId,
-            weight: String(weight.toFixed(2)) // Use absolute value of summed loss as weight
-         });
-         totalAggregatedWeight += weight;
-    }
-
-     // Optional check: Ensure total weight matches total amount after aggregation
-     if (Math.abs(totalAggregatedWeight - totalAmount) > 0.01) {
-         console.warn(`Aggregated weight (${totalAggregatedWeight.toFixed(2)}) does not match total amount (${totalAmount.toFixed(2)}). Check mapping/calculation.`);
-         // This might happen due to rounding or if some losers couldn't be mapped.
+     if (Object.keys(scores).length === 0 || Object.keys(players).length === 0) {
+         return res.status(400).json({ error: 'Scores and players objects cannot be empty.' });
      }
 
-    // Construct Settle Up Payload
-    const payload = {
-      category: '🏆',
-      currencyCode: SETTLE_UP_CURRENCY_CODE,
-      dateTime: Date.now(),
-      purpose: `Mahjong Game Settlement (Game ${gameId || 'N/A'})`,
-      type: 'expense',
-      whoPaid: [
-        {
-          memberId: primaryPayerMemberId,
-          weight: '1', // Single primary payer conceptually "covers" the expense
-        },
-      ],
-      items: [
-        {
-          amount: String(totalAmount.toFixed(2)),
-          forWhom: recipientItems, // Use the aggregated recipient items
-        },
-      ],
-    };
-
-    // Make the API Call to Settle Up
-    const url = `${SETTLE_UP_API_URL}/transactions/${SETTLE_UP_GROUP_ID}.json`;
-    console.log(`Posting aggregated expense to Settle Up: ${url}`);
-    // console.log("Payload:", JSON.stringify(payload, null, 2)); // For debugging
-
-    const response = await axios.post(url, payload, {
-      params: { auth: firebaseIdToken },
-      headers: { 'Content-Type': 'application/json' },
-    });
-
-    console.log('Settle Up API Response:', response.data);
-    return res.status(200).json({ success: true, transactionId: response.data.name });
-
-  } catch (error) {
-    console.error('Error processing Settle Up expense:', error);
-    let errorMessage = 'Failed to add expense to Settle Up.';
-    if (error.response) {
-      console.error('Settle Up Status:', error.response.status);
-      console.error('Settle Up Data:', error.response.data);
-      errorMessage = `Settle Up API Error: ${error.response.data?.error || error.message}`;
-    } else {
-      console.error('Error Message:', error.message);
-       errorMessage = error.message;
+    // --- Get target group name from environment ---
+    const targetGroupName = process.env.SETTLEUP_GROUP_NAME;
+    if (!targetGroupName) {
+        console.error("Environment variable SETTLEUP_GROUP_NAME is not set.");
+        return res.status(500).json({ error: 'SettleUp group configuration missing on server.' });
     }
-    // Avoid exposing detailed internal errors unless necessary
-    if (errorMessage.includes("Could not map") || errorMessage.includes("mapping")) {
-        errorMessage = "Configuration error: Could not map all players to Settle Up IDs.";
+
+    let token;
+    let uid;
+    let groupId;
+    let groupMembersObject;
+
+    try {
+        // --- Step 1: Log in using backend credentials ---
+        console.log("SettleUp Expense API: Logging in with backend credentials...");
+        const loginResult = await loginSettleUpBackend(); // No args needed
+        uid = loginResult.uid;
+        token = loginResult.token;
+        console.log("SettleUp Expense API: Backend login successful.");
+
+        // --- Step 2: Find the target Group ID ---
+        console.log(`SettleUp Expense API: Finding group ID for "${targetGroupName}"...`);
+        groupId = await findGroupIdByName(targetGroupName, uid, token);
+        if (!groupId) {
+            throw new Error(`SettleUp group named "${targetGroupName}" not found or not accessible by backend user.`);
+        }
+        console.log(`SettleUp Expense API: Found group ID: ${groupId}`);
+
+        // --- Step 3: Get all members of the target group ---
+        console.log(`SettleUp Expense API: Fetching members for group ${groupId}...`);
+        groupMembersObject = await getGroupMembers(groupId, token);
+        if (!groupMembersObject) {
+             throw new Error(`Could not fetch members for group ${groupId}. Check permissions or group existence.`);
+        }
+        console.log(`SettleUp Expense API: Fetched ${Object.keys(groupMembersObject).length} members.`);
+
+        // --- Step 4: Map player names from game data to SettleUp Member IDs ---
+        console.log("SettleUp Expense API: Mapping player names to member IDs...");
+        const involvedMemberIds = {}; // Store { memberId: score }
+        const playerErrors = [];
+
+        // Iterate through the players involved in the game (passed from frontend)
+        for (const seat in players) {
+            const playerNameString = players[seat]; // e.g., "Alice" or "Bob + Charlie"
+            const seatScore = scores[seat];
+
+            // Handle potentially multiple players per seat string (e.g., "Bob + Charlie")
+            const playerNames = playerNameString.split('+').map(name => name.trim()).filter(name => name);
+
+            if (playerNames.length === 0) continue; // Skip empty seats
+
+            // Find member ID for each player name
+            for (const playerName of playerNames) {
+                 const memberId = findMemberIdByName(groupMembersObject, playerName);
+                 if (!memberId) {
+                     playerErrors.push(`Player "${playerName}" not found in SettleUp group "${targetGroupName}".`);
+                 } else {
+                     // Assign the score to this memberId.
+                     // If multiple players share a seat, they share the seat's score.
+                     // SettleUp might require individual splits, this logic assumes the seat score applies to all in that seat.
+                     // Adjust if SettleUp needs per-player amounts when sharing a seat.
+                     involvedMemberIds[memberId] = seatScore;
+                 }
+            }
+        }
+
+        // If any player mapping failed, stop and report error
+        if (playerErrors.length > 0) {
+            console.error("SettleUp Expense API: Player mapping errors:", playerErrors);
+            // Return 400 Bad Request because the input data (player names) doesn't match SettleUp group
+            return res.status(400).json({ error: `Player mapping failed: ${playerErrors.join(' ')}` });
+        }
+        console.log("SettleUp Expense API: Player mapping successful:", involvedMemberIds);
+
+        // --- Step 5: Construct the SettleUp Expense Payload ---
+        console.log("SettleUp Expense API: Constructing expense payload...");
+        const expensePayload = {
+            purpose: `Game Score Entry (ID: ${gameId})`, // Descriptive purpose
+            date: getCurrentTimestamp(), // Use current server time
+            currency: "CAD", // Assuming CAD, adjust if needed or make configurable
+            whoPaid: [], // Array of { memberId: amount }
+            participants: [], // Array of { memberId: spent/owes? } - Structure depends heavily on SettleUp API
+            type: "EXPENSE", // Common type
+            // categoryId: "OPTIONAL_CATEGORY_ID", // Optional: Set if you use categories
+        };
+
+        let totalPositive = 0;
+        let totalNegative = 0;
+        const creditors = []; // { memberId: amount } - Amount is positive
+        const debtors = [];   // { memberId: amount } - Amount is negative
+
+        for (const memberId in involvedMemberIds) {
+            const score = involvedMemberIds[memberId];
+            if (score > 0) {
+                totalPositive += score;
+                creditors.push({ memberId: memberId, amount: score });
+            } else if (score < 0) {
+                totalNegative += score;
+                debtors.push({ memberId: memberId, amount: score });
+            }
+            // Ignore players with score 0 for the expense calculation
+        }
+
+        // Basic validation: total score should be (close to) zero
+        if (Math.abs(totalPositive + totalNegative) > 0.01) {
+             throw new Error(`Internal calculation error: Scores do not sum to zero (${totalPositive + totalNegative}). Cannot create balanced expense.`);
+        }
+
+        // --- Define Payer(s) and Participants based on SettleUp API structure ---
+        // **This is the most complex part and depends heavily on SettleUp's exact API requirements for splits.**
+        // Common Pattern 1: One person pays the total positive amount, participants define what they owe/receive.
+        if (creditors.length > 0) {
+             // Let the first creditor pay the total amount
+             expensePayload.whoPaid.push({ memberId: creditors[0].memberId, amount: totalPositive });
+
+             // Define how much each participant "spent" (positive score) or "owes" (negative score)
+             // SettleUp might use 'spent', 'weight', 'owes' etc. Assuming 'spent' for now.
+             // 'spent' usually means the benefit received. For debtors, benefit is 0. For creditors, benefit is their positive score.
+             // This might need adjustment based on testing SettleUp API.
+             for (const memberId in involvedMemberIds) {
+                 const score = involvedMemberIds[memberId];
+                 expensePayload.participants.push({
+                     memberId: memberId,
+                     // 'spent' is often the benefit received. Debtors received 0 benefit from this transaction's perspective.
+                     // Creditors 'spent' the negative of their score (they provided value). SettleUp might invert this. TEST NEEDED.
+                     // Let's try setting 'spent' to the actual score value and see how SettleUp interprets it.
+                     // A positive 'spent' might mean they received value, negative 'spent' means they provided value.
+                     // Alternative: Use 'owes' if SettleUp supports it directly.
+                     spent: score // **ASSUMPTION - TEST THIS**
+                     // weight: 1 // Alternative if using weights
+                 });
+             }
+        } else {
+            // Handle edge case: all scores are 0? Or only debtors?
+            // If only debtors, this model breaks. SettleUp might need a dummy payer or different structure.
+            // For now, if no creditors, we can't create the expense with this model.
+            if (debtors.length > 0) {
+                 console.warn("SettleUp Expense API: Only debtors found, cannot create expense with the current payer model.");
+                 // Optionally return a specific message or skip SettleUp creation
+                 return res.status(200).json({ message: "Game recorded to sheet, but SettleUp expense skipped (no creditors)." });
+            } else {
+                 console.log("SettleUp Expense API: All scores are zero, skipping SettleUp expense creation.");
+                 return res.status(200).json({ message: "Game recorded to sheet, SettleUp expense skipped (all scores zero)." });
+            }
+        }
+
+
+        // --- Step 6: Create the Expense in Settle Up ---
+        console.log("SettleUp Expense API: Calling createSettleUpExpense...");
+        const creationResult = await createSettleUpExpense(groupId, token, expensePayload);
+
+        // --- Step 7: Return Success Response ---
+        console.log("SettleUp Expense API: Expense creation successful.");
+        return res.status(200).json({
+            message: "SettleUp expense created successfully.",
+            settleUpTransactionId: creationResult?.name // Return the new transaction ID if available
+        });
+
+    } catch (error) {
+        // Catch errors from any step
+        console.error("SettleUp Expense API Error:", error.message);
+        // Determine appropriate status code
+        let statusCode = 500; // Default to Internal Server Error
+        if (error.message.includes("Invalid backend Settle Up email or password") || error.message.includes("Authentication error")) {
+            statusCode = 500; // Config/Auth issue on backend
+        } else if (error.message.includes("not found") || error.message.includes("Could not fetch")) {
+            statusCode = 404; // Resource not found (group, members)
+        } else if (error.message.includes("Failed to create Settle Up expense")) {
+             statusCode = 502; // Bad Gateway - error communicating with SettleUp
+        }
+
+        return res.status(statusCode).json({ error: error.message || "An internal server error occurred during SettleUp expense creation." });
     }
-    return res.status(500).json({ error: errorMessage });
-  }
 }
