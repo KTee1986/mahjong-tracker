@@ -12,7 +12,7 @@ const navItems = [
   /*{ label: "Advanced Stats", path: "/advanced-stats" },
   { label: "Head-to-Head", path: "/head-to-head" },*/
   { label: "Player List", path: "/player-list" },
-  { label: "Settleup details", path: "/settleup-groups-members" },
+  { label: "Settleup Group and Members", path: "/settleup-groups-members" },
 ];
 
 export default function Layout({ children }) {

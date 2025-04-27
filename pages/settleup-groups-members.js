@@ -1,44 +1,43 @@
-// pages/settleup-groups-members.js (or any name you prefer)
-import { useState } from "react";
+// pages/settleup-groups-members.js (Using Backend Authentication)
+import { useState, useEffect } from "react";
 import Layout from "../components/Layout"; // Assuming you have a Layout component
+import { useRouter } from "next/router";
 
 export default function SettleUpGroupsAndMembers() {
-  // State for user inputs
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-
-  // State for API interaction
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-
-  // State to store the fetched data (groups with their members)
-  // Structure: [{ id: 'groupId', name: 'GroupName', members: [{ memberId: 'mId', name: 'MemberName', active: true/false }], fetchError: boolean }, ...]
+  const [message, setMessage] = useState("");
+  // Expects members to have { memberId, name, active, permission }
   const [groupData, setGroupData] = useState(null);
 
+  // Optional: Add authentication check for your own application if needed
+  // useEffect(() => {
+  //   const loggedIn = sessionStorage.getItem("isLoggedIn"); // Or your auth method
+  //   if (loggedIn !== "true") {
+  //     router.replace("/login"); // Redirect to your app's login if needed
+  //   }
+  // }, [router]);
+
   /**
-   * Handles the form submission to fetch groups and their members.
+   * Handles fetching the groups and members using backend credentials.
    */
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleFetchData = async () => {
     setIsLoading(true);
     setError("");
+    setMessage("");
     setGroupData(null); // Reset previous results
 
-    // Basic input validation
-    if (!email || !password) {
-      setError("Please fill in Email and Password.");
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      // Call the new backend endpoint
+      // Call the backend endpoint. No body needed as auth uses env vars.
       const res = await fetch('/api/get-settleup-groups-and-members', {
-        method: 'POST',
+        method: 'POST', // Still POST to trigger the serverless function easily
         headers: {
           'Content-Type': 'application/json',
+          // No Authorization header needed here if your API route is protected differently
+          // or if it's intended to be called by authenticated users of your app.
         },
-        body: JSON.stringify({ email, password }),
+        // No body - backend uses environment variables for SettleUp auth
       });
 
       const data = await res.json();
@@ -56,6 +55,11 @@ export default function SettleUpGroupsAndMembers() {
 
       // Store the fetched data
       setGroupData(data.groupsWithMembers);
+      if (data.groupsWithMembers.length === 0) {
+        setMessage("No Settle Up groups found for the configured backend account.");
+      } else {
+         setMessage("Data fetched successfully."); // Provide success feedback
+      }
 
     } catch (err) {
       console.error("Fetch error:", err);
@@ -67,7 +71,7 @@ export default function SettleUpGroupsAndMembers() {
 
   /**
    * Renders the table for members of a single group.
-   * @param {Array} members - Array of member objects for the group.
+   * @param {Array} members - Array of member objects including permission text.
    */
   const renderMemberTable = (members) => {
     if (!members || members.length === 0) {
@@ -88,19 +92,35 @@ export default function SettleUpGroupsAndMembers() {
               <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Active
               </th>
+              <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Permission
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {members.map((member) => (
               <tr key={member.memberId}>
                 <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {member.name}
+                  {member.name || '(No Name)'}
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
                   <code className="text-xs bg-gray-100 px-1 rounded">{member.memberId}</code>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
                   {member.active ? 'Yes' : 'No'}
+                </td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                  {/* Display the permission text received from backend */}
+                  {member.permission ? (
+                     <span className={`${
+                         member.permission === 'Owner' ? 'font-semibold text-red-600' :
+                         member.permission === 'Read-Write' ? 'text-blue-600' : ''
+                     }`}>
+                         {member.permission}
+                     </span>
+                  ) : (
+                     <span className="italic text-gray-400">N/A</span> // If permission couldn't be fetched/mapped
+                  )}
                 </td>
               </tr>
             ))}
@@ -115,66 +135,28 @@ export default function SettleUpGroupsAndMembers() {
     <Layout>
       <h1 className="text-2xl font-bold mb-4 text-gray-800">Settle Up Groups & Members</h1>
       <p className="text-sm text-gray-600 mb-6">
-        Enter your Settle Up credentials to fetch all your groups and their members.
+        Click the button below to fetch group and member data using the pre-configured backend Settle Up account.
       </p>
 
-      {/* Input Form */}
-      <form onSubmit={handleSubmit} className="space-y-4 max-w-md mb-8 bg-white p-6 rounded-lg shadow">
-         <div>
-           <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-             Settle Up User Email:
-           </label>
-           <input
-             type="email"
-             id="email"
-             value={email}
-             onChange={(e) => setEmail(e.target.value)}
-             required
-             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-black"
-             placeholder="user@example.com"
-             autoComplete="email"
-           />
-         </div>
-         <div>
-           <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-             Settle Up User Password:
-           </label>
-           <input
-             type="password"
-             id="password"
-             value={password}
-             onChange={(e) => setPassword(e.target.value)}
-             required
-             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-black"
-             placeholder="Password"
-             autoComplete="current-password"
-           />
-         </div>
-         <div>
-           <button
-             type="submit"
-             disabled={isLoading}
-             className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-           >
-             {isLoading ? "Fetching Data..." : "Fetch Groups and Members"}
-           </button>
-         </div>
-      </form>
+      {/* Button to trigger fetch */}
+      <div className="mb-8 max-w-md">
+        <button
+          onClick={handleFetchData}
+          disabled={isLoading}
+          className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isLoading ? "Fetching Data..." : "Fetch Settle Up Data"}
+        </button>
+      </div>
 
       {/* Loading State */}
-      {isLoading && (
-        <div className="text-center p-4">
-          <p className="text-indigo-600">Loading data...</p>
-          {/* Optional: Add a spinner */}
-        </div>
-      )}
+      {isLoading && ( <div className="text-center p-4"><p className="text-indigo-600">Loading data...</p></div> )}
 
       {/* Error Display */}
-      {error && (
-        <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-md shadow-sm">
-          <p><span className="font-bold">Error:</span> {error}</p>
-        </div>
-      )}
+      {error && ( <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-md shadow-sm"><p><span className="font-bold">Error:</span> {error}</p></div> )}
+
+      {/* Success/Info Message Display */}
+      {message && !error && ( <div className="mt-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-md shadow-sm"><p>{message}</p></div> )}
 
       {/* Results Display */}
       {groupData && !isLoading && (
@@ -189,12 +171,13 @@ export default function SettleUpGroupsAndMembers() {
                 {group.fetchError ? (
                    <p className="italic text-sm text-red-600 px-4">Could not fetch full details or members for this group.</p>
                 ) : (
-                   renderMemberTable(group.members)
+                   renderMemberTable(group.members) // This function now renders the extra column
                 )}
               </div>
             ))
           ) : (
-            <p className="italic text-gray-500">No groups found for this user.</p>
+            // Message state now handles the "no groups found" case
+            !message && <p className="italic text-gray-500">No group data loaded.</p>
           )}
         </div>
       )}
