@@ -58,7 +58,7 @@ export default async function handler(req, res) {
         for (const seat in players) {
             const seatPlayers = players[seat];
             const seatScore = scores[seat];
-            if (!Array.isArray(seatPlayers)) continue; // Skip malformed data
+            if (!Array.isArray(seatPlayers)) continue;
 
             for (const playerObj of seatPlayers) {
                 const memberId = playerObj?.settleUpMemberId;
@@ -77,21 +77,21 @@ export default async function handler(req, res) {
         }
         console.log("SettleUp Expense API: Aggregated scores by Member ID:", aggregatedScores);
 
-        // --- Step 3: Construct the SettleUp Expense Payload (New Structure) ---
-        console.log("SettleUp Expense API: Constructing expense payload (New Structure)...");
+        // --- Step 3: Construct the SettleUp Expense Payload (Multi-Payer Structure) ---
+        console.log("SettleUp Expense API: Constructing expense payload (Multi-Payer Structure)...");
 
         let totalPositive = 0;
         let totalNegative = 0;
-        const creditors = []; // { memberId: amount } - Still useful for determining whoPaid
-        const involvedParticipants = []; // Store { memberId: memberId } for forWhom list
+        const creditors = []; // Array of { memberId: string, amount: number } for those with positive scores
+        const involvedParticipants = []; // Array of { memberId: string } for everyone with non-zero score
 
         for (const memberId in aggregatedScores) {
             const roundedScore = roundToTwoDecimals(aggregatedScores[memberId]);
-            if (Math.abs(roundedScore) > 0.01) { // Only consider non-zero scores for participation
-                 involvedParticipants.push({ memberId: memberId }); // Add to participant list
+            if (Math.abs(roundedScore) > 0.01) { // Only consider non-zero scores
+                 involvedParticipants.push({ memberId: memberId }); // Add to participant list for forWhom
                  if (roundedScore > 0) {
                      totalPositive += roundedScore;
-                     creditors.push({ memberId: memberId, amount: roundedScore }); // Keep track of potential payers
+                     creditors.push({ memberId: memberId, amount: roundedScore }); // Store positive amount
                  } else {
                      totalNegative += roundedScore;
                  }
@@ -112,30 +112,33 @@ export default async function handler(req, res) {
              return res.status(200).json({ message: "Game recorded to sheet, SettleUp expense skipped (all aggregated scores zero)." });
         }
         if (creditors.length === 0 && involvedParticipants.length > 0) {
-             console.warn("SettleUp Expense API: Only debtors found after aggregation, cannot create expense with the current model.");
+             console.warn("SettleUp Expense API: Only debtors found after aggregation, cannot create expense with the current payer model.");
              return res.status(200).json({ message: "Game recorded to sheet, but SettleUp expense skipped (no creditors after aggregation)." });
         }
 
         // --- Build the Payload ---
         const expensePayload = {
             purpose: `Game Score Entry (ID: ${gameId})`,
-            dateTime: getCurrentTimestamp(), // Use renamed field
-            currencyCode: "CAD",            // Use renamed field, adjust if needed
-            type: "expense",                // Use lowercase value
-            category: "🎲",                 // Added default category (Dice emoji)
-            fixedExchangeRate: false,       // Added field
-            exchangeRates: {},              // Added field (empty)
-            receiptUrl: null,               // Added field (null)
+            dateTime: getCurrentTimestamp(),
+            currencyCode: "CAD", // Adjust if needed
+            type: "expense",
+            category: "🎲",
+            fixedExchangeRate: false,
+            exchangeRates: {},
+            receiptUrl: null,
 
-            // Define who paid using weights
-            whoPaid: creditors.length > 0
-                ? [{ memberId: creditors[0].memberId, weight: "1" }] // First creditor paid all, weight 1
-                : [], // Should not happen due to check above, but safety
+            // *** MODIFIED: whoPaid uses amounts ***
+            // Map over the creditors array to create the whoPaid structure
+            whoPaid: creditors.map(creditor => ({
+                memberId: creditor.memberId,
+                amount: String(creditor.amount) // Use amount (as string) instead of weight
+            })),
+            // *** END MODIFIED ***
 
-            // Define items and who the expense was for using weights
+            // Define items and who the expense was for using weights (standard split)
             items: [
                 {
-                    // Amount is the total positive value (total paid)
+                    // Amount is the total positive value (total paid by all creditors)
                     amount: String(totalPositive), // Amount as string
                     // forWhom includes all participants with non-zero scores, equal weight
                     forWhom: involvedParticipants.map(p => ({
@@ -151,6 +154,11 @@ export default async function handler(req, res) {
              console.warn("SettleUp Expense API: No participants identified for the expense item. Skipping creation.");
              return res.status(200).json({ message: "Game recorded to sheet, SettleUp expense skipped (no non-zero participants)." });
         }
+         // Ensure there are payers if needed
+         if (expensePayload.whoPaid.length === 0) {
+             console.warn("SettleUp Expense API: No payers identified (creditors list empty). Skipping creation.");
+             return res.status(200).json({ message: "Game recorded to sheet, SettleUp expense skipped (no creditors)." });
+         }
 
         // --- Step 4: Log the payload and Create the Expense ---
         console.log("SettleUp Expense API: Payload to be sent:", JSON.stringify(expensePayload, null, 2));
