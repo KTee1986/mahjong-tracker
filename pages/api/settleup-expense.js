@@ -7,8 +7,12 @@ import {
 
 // Helper function to get current timestamp
 const getCurrentTimestamp = () => new Date().getTime();
-// Helper function for float precision
-const roundToTwoDecimals = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
+// Helper function for float precision (less critical for weights but good practice)
+const roundToPrecision = (num, precision = 8) => {
+    const factor = Math.pow(10, precision);
+    return Math.round((num + Number.EPSILON) * factor) / factor;
+}
+
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
@@ -67,9 +71,17 @@ export default async function handler(req, res) {
                     mappingErrors.push(`Missing SettleUp Member ID for player "${playerName}" in seat ${seat}.`);
                     continue;
                 }
-                aggregatedScores[memberId] = roundToTwoDecimals((aggregatedScores[memberId] || 0) + seatScore);
+                // Use higher precision for intermediate sums
+                const currentAggScore = aggregatedScores[memberId] || 0;
+                aggregatedScores[memberId] = currentAggScore + seatScore;
             }
         }
+
+        // Round final aggregated scores after summing
+        for (const memberId in aggregatedScores) {
+             aggregatedScores[memberId] = roundToPrecision(aggregatedScores[memberId], 4); // Round to reasonable precision
+        }
+
 
         if (mappingErrors.length > 0) {
             console.error("SettleUp Expense API: Player ID mapping errors:", mappingErrors);
@@ -77,43 +89,46 @@ export default async function handler(req, res) {
         }
         console.log("SettleUp Expense API: Aggregated scores by Member ID:", aggregatedScores);
 
-        // --- Step 3: Construct the SettleUp Expense Payload (Multi-Payer Structure) ---
-        console.log("SettleUp Expense API: Constructing expense payload (Multi-Payer Structure)...");
+        // --- Step 3: Construct the SettleUp Expense Payload (Calculated Weights) ---
+        console.log("SettleUp Expense API: Constructing expense payload (Calculated Weights)...");
 
         let totalPositive = 0;
         let totalNegative = 0;
-        const creditors = []; // Array of { memberId: string, amount: number } for those with positive scores
-        const involvedParticipants = []; // Array of { memberId: string } for everyone with non-zero score
+        const creditors = []; // Array of { memberId: string, score: number }
+        const debtors = [];   // Array of { memberId: string, score: number } (score is negative)
 
         for (const memberId in aggregatedScores) {
-            const roundedScore = roundToTwoDecimals(aggregatedScores[memberId]);
-            if (Math.abs(roundedScore) > 0.01) { // Only consider non-zero scores
-                 involvedParticipants.push({ memberId: memberId }); // Add to participant list for forWhom
-                 if (roundedScore > 0) {
-                     totalPositive += roundedScore;
-                     creditors.push({ memberId: memberId, amount: roundedScore }); // Store positive amount
+            const score = aggregatedScores[memberId]; // Use the already rounded score
+            if (Math.abs(score) > 0.001) { // Use tolerance for zero check
+                 if (score > 0) {
+                     totalPositive += score;
+                     creditors.push({ memberId: memberId, score: score });
                  } else {
-                     totalNegative += roundedScore;
+                     totalNegative += score;
+                     debtors.push({ memberId: memberId, score: score }); // Keep score negative
                  }
             }
         }
-        totalPositive = roundToTwoDecimals(totalPositive);
-        totalNegative = roundToTwoDecimals(totalNegative);
+        // Round final totals
+        totalPositive = roundToPrecision(totalPositive, 4);
+        totalNegative = roundToPrecision(totalNegative, 4);
 
-        // Validation
+        // Validation: Check if totals balance (use tolerance)
         if (Math.abs(totalPositive + totalNegative) > 0.01) {
              console.error(`Internal calculation error: Aggregated scores do not sum to zero (${totalPositive + totalNegative}).`);
-             throw new Error(`Internal calculation error: Aggregated scores do not sum to zero (${roundToTwoDecimals(totalPositive + totalNegative)}). Cannot create balanced expense.`);
+             throw new Error(`Internal calculation error: Aggregated scores do not sum to zero (${roundToPrecision(totalPositive + totalNegative, 2)}). Cannot create balanced expense.`);
         }
 
-        // Handle cases with no activity or only debt
-        if (involvedParticipants.length === 0) {
+        // Handle cases with no activity or only one side
+        if (creditors.length === 0 && debtors.length === 0) {
              console.log("SettleUp Expense API: All aggregated scores are zero, skipping SettleUp expense creation.");
              return res.status(200).json({ message: "Game recorded to sheet, SettleUp expense skipped (all aggregated scores zero)." });
         }
-        if (creditors.length === 0 && involvedParticipants.length > 0) {
-             console.warn("SettleUp Expense API: Only debtors found after aggregation, cannot create expense with the current payer model.");
-             return res.status(200).json({ message: "Game recorded to sheet, but SettleUp expense skipped (no creditors after aggregation)." });
+        // If only creditors or only debtors, SettleUp usually can't represent this as a single expense.
+        // The logic relies on having both sides to calculate weights relative to the total transfer amount (totalPositive).
+        if (creditors.length === 0 || debtors.length === 0) {
+             console.warn("SettleUp Expense API: Only creditors or only debtors found. Cannot calculate weights properly for a single expense. Skipping SettleUp sync.");
+             return res.status(200).json({ message: "Game recorded to sheet, but SettleUp expense skipped (cannot represent one-sided balance)." });
         }
 
         // --- Build the Payload ---
@@ -127,34 +142,36 @@ export default async function handler(req, res) {
             exchangeRates: {},
             receiptUrl: null,
 
-            // *** MODIFIED: whoPaid uses amounts ***
-            // Map over the creditors array to create the whoPaid structure
+            // *** MODIFIED: whoPaid uses calculated weights ***
             whoPaid: creditors.map(creditor => ({
                 memberId: creditor.memberId,
-                amount: String(creditor.amount) // Use amount (as string) instead of weight
+                // Weight is proportion of their positive score to the total positive score
+                weight: String(roundToPrecision(creditor.score / totalPositive, 8)) // Use high precision for weights
             })),
             // *** END MODIFIED ***
 
-            // Define items and who the expense was for using weights (standard split)
             items: [
                 {
                     // Amount is the total positive value (total paid by all creditors)
-                    amount: String(totalPositive), // Amount as string
-                    // forWhom includes all participants with non-zero scores, equal weight
-                    forWhom: involvedParticipants.map(p => ({
-                        memberId: p.memberId,
-                        weight: "1" // Assign equal weight to all involved
+                    amount: String(roundToPrecision(totalPositive, 2)), // Amount rounded to currency precision
+
+                    // *** MODIFIED: forWhom uses calculated weights for debtors ***
+                    forWhom: debtors.map(debtor => ({
+                        memberId: debtor.memberId,
+                        // Weight is proportion of their debt (absolute value) to the total debt (which equals totalPositive)
+                        weight: String(roundToPrecision(Math.abs(debtor.score) / totalPositive, 8)) // Use high precision
                     }))
+                    // *** END MODIFIED ***
                 }
             ]
         };
 
-        // Ensure item has participants
+        // Ensure item has participants (debtors)
         if (expensePayload.items[0].forWhom.length === 0) {
-             console.warn("SettleUp Expense API: No participants identified for the expense item. Skipping creation.");
-             return res.status(200).json({ message: "Game recorded to sheet, SettleUp expense skipped (no non-zero participants)." });
+             console.warn("SettleUp Expense API: No debtors identified for the expense item. Skipping creation.");
+             return res.status(200).json({ message: "Game recorded to sheet, SettleUp expense skipped (no debtors)." });
         }
-         // Ensure there are payers if needed
+         // Ensure there are payers (creditors)
          if (expensePayload.whoPaid.length === 0) {
              console.warn("SettleUp Expense API: No payers identified (creditors list empty). Skipping creation.");
              return res.status(200).json({ message: "Game recorded to sheet, SettleUp expense skipped (no creditors)." });
