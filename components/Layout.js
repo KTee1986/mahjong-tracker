@@ -10,8 +10,9 @@ const navItems = [
   { label: "Stats", path: "/stats" },
   { label: "Player Insights", path: "/player-insights" },
   /*{ label: "Advanced Stats", path: "/advanced-stats" },
-  { label: "Head-to-Head", path: "/head-to-head" },*/
-  { label: "Player List", path: "/player-list" },
+  { label: "Head-to-Head", path: "/head-to-head" },
+  { label: "Player List", path: "/player-list" },*/
+  { label: "Settleup Debts", path: "/settleup-debts" },
   { label: "Settleup Group and Members", path: "/settleup-groups-members" },
 ];
 
