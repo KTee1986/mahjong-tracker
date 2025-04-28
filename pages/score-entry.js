@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
-import Layout from "../components/Layout";
+import Layout from "../components/Layout"; // Assuming Layout provides main structure
 
 const seats = ["East", "South", "West", "North"];
 const colors = ["Red", "Blue", "Green", "White"];
@@ -103,7 +103,6 @@ export default function ScoreEntry() {
     setSumOfScores(parseFloat(newSum.toFixed(1)));
   }, [scores]);
 
-  // --- MODIFIED: Handle different backend messages ---
   const triggerSettleUpIntegration = async (gameData) => {
     setMessage(prev => prev + " | Checking Settle Up sync..."); // Initial message
     try {
@@ -116,26 +115,20 @@ export default function ScoreEntry() {
           players: gameData.players,
         }),
       });
-
       const settleUpData = await settleUpRes.json();
-
       if (settleUpRes.ok) {
-        // Display the specific message from the backend
         setMessage(prev => prev.replace(" | Checking Settle Up sync...", "") + ` | ${settleUpData.message || 'Settle Up status unknown.'}`);
       } else {
-        // Handle API errors
         console.error("Settle Up API Error:", settleUpData.error);
         setError(prev => (prev ? prev + " | " : "") + `Settle Up Error: ${settleUpData.error || 'Unknown error'}`);
-        setMessage(prev => prev.replace(" | Checking Settle Up sync...", "")); // Clear checking message on error
+        setMessage(prev => prev.replace(" | Checking Settle Up sync...", ""));
       }
     } catch (err) {
-      // Handle fetch/network errors
       console.error("Failed to trigger Settle Up integration:", err);
       setError(prev => (prev ? prev + " | " : "") + `Failed to connect for Settle Up sync.`);
-      setMessage(prev => prev.replace(" | Checking Settle Up sync...", "")); // Clear checking message on error
+      setMessage(prev => prev.replace(" | Checking Settle Up sync...", ""));
     }
   }
-  // --- END MODIFIED ---
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
@@ -223,21 +216,25 @@ export default function ScoreEntry() {
 
   return (
     <Layout>
-      <h1 className="text-xl font-bold mb-4">Score Entry</h1>
+      {/* Assuming Layout doesn't force a background, otherwise need to override */}
+      {/* Main title - ensure contrast if Layout background is black */}
+      <h1 className="text-xl font-bold mb-4 text-white">Score Entry</h1>
 
       {/* Player Selection Sections */}
       {seats.map((seat) => (
-        <div key={seat} className="mb-6 p-4 border rounded bg-gray-50">
-          <label className="block font-semibold text-lg mb-2">{seat} Players</label>
+        // *** MODIFIED: Changed background to black, adjusted text/elements inside ***
+        <div key={seat} className="mb-6 p-4 border border-gray-700 rounded bg-black text-gray-200">
+          <label className="block font-semibold text-lg mb-2 text-white">{seat} Players</label>
           <div className="flex flex-wrap gap-2 mb-3">
             {getAvailablePlayersForSeat(seat).map((player) => (
               <button
-                key={player.name} // Unique by name for display
+                key={player.name}
                 onClick={() => handlePlayerSelect(seat, player)}
+                // Adjusted button colors for black background
                 className={`px-2 py-1 rounded text-xs mt-1 mb-1 text-center whitespace-nowrap transition-colors duration-150 ${
                   players[seat].some(p => p.name === player.name)
-                    ? "bg-blue-600 text-white ring-2 ring-blue-300"
-                    : "bg-gray-200 hover:bg-gray-300 text-black"
+                    ? "bg-blue-600 text-white ring-2 ring-blue-400" // Selected: keep blue
+                    : "bg-gray-700 hover:bg-gray-600 text-gray-100" // Default: dark gray
                 } ${players[seat].length >= MAX_PLAYERS_PER_SEAT && !players[seat].some(p => p.name === player.name) ? "opacity-50 cursor-not-allowed" : ""}`}
                 disabled={players[seat].length >= MAX_PLAYERS_PER_SEAT && !players[seat].some(p => p.name === player.name)}
                 style={{ minWidth: "5ch" }}
@@ -245,44 +242,59 @@ export default function ScoreEntry() {
                 {player.name}
               </button>
             ))}
-             {players[seat].length === 0 && <span className="text-xs text-gray-500 italic">Select player(s)</span>}
+             {players[seat].length === 0 && <span className="text-xs text-gray-400 italic">Select player(s)</span>}
           </div>
 
           {/* Color Selection Sections */}
-          <label className="block font-semibold text-lg mb-2">{seat} Colors</label>
+          <label className="block font-semibold text-lg mb-2 text-white">{seat} Colors</label>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-2">
             {colors.map((color) => (
-              <div key={color} className="flex flex-col items-center p-2 bg-white rounded shadow-sm">
-                <label className="mb-1 font-medium text-sm">{color} ({colorValues[color]})</label>
+              // Adjusted background for color selection boxes
+              <div key={color} className="flex flex-col items-center p-2 bg-gray-800 rounded shadow-sm">
+                <label className="mb-1 font-medium text-sm text-gray-200">{color} ({colorValues[color]})</label>
                 <div className="flex items-center justify-center mt-1">
-                  <button onClick={() => handleColorChange(seat, color, -1)} className="px-3 py-1 rounded-l bg-red-200 hover:bg-red-300 text-red-800 font-bold disabled:opacity-50" disabled={colorCounts[seat][color] <= 0}>-</button>
-                  <div className="px-2 py-1 text-center mx-0 bg-gray-100 font-mono text-sm" style={{ width: `${INPUT_WIDTH_CH + 1}ch`, minWidth: `${INPUT_WIDTH_CH + 1}ch` }}>{colorCounts[seat][color] || 0}</div>
-                  <button onClick={() => handleColorChange(seat, color, 1)} className="px-3 py-1 rounded-r bg-green-200 hover:bg-green-300 text-green-800 font-bold">+</button>
+                  {/* Adjusted +/- button colors */}
+                  <button onClick={() => handleColorChange(seat, color, -1)} className="px-3 py-1 rounded-l bg-red-800 hover:bg-red-700 text-red-100 font-bold disabled:opacity-50" disabled={colorCounts[seat][color] <= 0}>-</button>
+                  {/* Adjusted count display colors */}
+                  <div className="px-2 py-1 text-center mx-0 bg-gray-700 font-mono text-sm text-white" style={{ width: `${INPUT_WIDTH_CH + 1}ch`, minWidth: `${INPUT_WIDTH_CH + 1}ch` }}>{colorCounts[seat][color] || 0}</div>
+                  <button onClick={() => handleColorChange(seat, color, 1)} className="px-3 py-1 rounded-r bg-green-800 hover:bg-green-700 text-green-100 font-bold">+</button>
                 </div>
               </div>
             ))}
           </div>
-          <p className="mt-3 font-semibold text-md">
-            Seat Score: <span className={scores[seat] >= 0 ? 'text-green-600' : 'text-red-600'}>{scores[seat]}</span>
+          {/* Adjusted score text color */}
+          <p className="mt-3 font-semibold text-md text-gray-200">
+            Seat Score: <span className={scores[seat] >= 0 ? 'text-green-400' : 'text-red-400'}>{scores[seat]}</span>
           </p>
         </div>
+        // *** END MODIFIED SECTION ***
       ))}
 
       {/* Submit Section */}
-      <div className="mt-4 p-4 border rounded bg-gray-100 sticky bottom-0">
-        <p className={`text-lg font-bold mb-2 ${Math.abs(sumOfScores) > 0.01 ? 'text-red-500 animate-pulse' : 'text-green-600'}`}>Sum of Scores: {sumOfScores} {Math.abs(sumOfScores) > 0.01 ? '(Must be 0!)' : '(OK)'}</p>
-        {error && <p className="text-red-500 text-sm break-words">{error}</p>}
-        {message && <p className="text-green-500 text-sm break-words">{message}</p>}
+      {/* *** MODIFIED: Changed background to black, adjusted text inside *** */}
+      <div className="mt-4 p-4 border border-gray-700 rounded bg-black sticky bottom-0">
+        {/* Adjusted sum text color */}
+        <p className={`text-lg font-bold mb-2 ${Math.abs(sumOfScores) > 0.01 ? 'text-red-400 animate-pulse' : 'text-green-400'}`}>
+            Sum of Scores: {sumOfScores} {Math.abs(sumOfScores) > 0.01 ? '(Must be 0!)' : '(OK)'}
+        </p>
+        {/* Adjusted error/message text colors */}
+        {error && <p className="text-red-400 text-sm break-words">{error}</p>}
+        {message && <p className="text-green-400 text-sm break-words">{message}</p>}
+        {/* Submit button colors are likely fine */}
         <button onClick={handleSubmit} className={`w-full bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white mt-2 text-lg font-semibold transition-opacity duration-200 ${isSubmitDisabled() ? "opacity-50 cursor-not-allowed" : ""}`} disabled={isSubmitDisabled()}>{isSubmitting ? "Submitting..." : "Submit Game"}</button>
       </div>
+       {/* *** END MODIFIED SECTION *** */}
+
 
       {/* Result Display */}
+      {/* *** MODIFIED: Changed background, adjusted text inside *** */}
       {latestGameResult && (
-        <div className="mt-8 p-4 bg-white rounded-md shadow border border-gray-200">
-          <h2 className="text-lg font-semibold mb-2 text-gray-800">Latest Game Result</h2>
-          <pre className="whitespace-pre-wrap text-sm text-gray-700 bg-gray-50 p-3 rounded">{latestGameResult}</pre>
+        <div className="mt-8 p-4 bg-gray-900 rounded-md shadow border border-gray-700">
+          <h2 className="text-lg font-semibold mb-2 text-gray-100">Latest Game Result</h2>
+          <pre className="whitespace-pre-wrap text-sm text-gray-200 bg-gray-800 p-3 rounded">{latestGameResult}</pre>
         </div>
       )}
+       {/* *** END MODIFIED SECTION *** */}
     </Layout>
   );
 }
