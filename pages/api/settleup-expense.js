@@ -8,7 +8,7 @@ import {
 // Helper function to get current timestamp
 const getCurrentTimestamp = () => new Date().getTime();
 
-// *** MODIFIED: Helper function for float precision ***
+// Helper function for float precision
 // Defaults to 20 decimal places for weights, can be overridden for currency
 const roundToPrecision = (num, precision = 20) => {
     // Using exponential notation to handle potential precision limits with large numbers of decimals
@@ -18,7 +18,6 @@ const roundToPrecision = (num, precision = 20) => {
     const epsilon = Number.EPSILON * Math.abs(num);
     return Math.round((num + epsilon) * factor) / factor;
 }
-// *** END MODIFIED ***
 
 
 export default async function handler(req, res) {
@@ -26,6 +25,14 @@ export default async function handler(req, res) {
         res.setHeader('Allow', ['POST']);
         return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
     }
+
+     // --- Check if SettleUp Sync is Enabled ---
+     const isSettleUpSyncEnabled = process.env.ENABLE_SETTLEUP_SYNC === 'true';
+     if (!isSettleUpSyncEnabled) {
+         console.log("SettleUp Expense API: Sync is disabled via environment variable.");
+         return res.status(200).json({ message: "SettleUp sync is disabled by configuration." });
+     }
+     // --- End Check ---
 
     // Expect structured players data: { East: [{ name, settleUpMemberId }, ...], ... }
     const { gameId, scores, players } = req.body;
@@ -78,7 +85,6 @@ export default async function handler(req, res) {
                     mappingErrors.push(`Missing SettleUp Member ID for player "${playerName}" in seat ${seat}.`);
                     continue;
                 }
-                // Summing with potentially higher precision internally
                 const currentAggScore = aggregatedScores[memberId] || 0;
                 // Avoid direct rounding here, sum first
                 aggregatedScores[memberId] = currentAggScore + seatScore;
@@ -130,70 +136,73 @@ export default async function handler(req, res) {
         // Handle cases with no activity or only one side
         if (creditors.length === 0 && debtors.length === 0) {
              console.log("SettleUp Expense API: All aggregated scores are zero, skipping SettleUp expense creation.");
-             return res.status(200).json({ message: "Game recorded to sheet, SettleUp expense skipped (all aggregated scores zero)." });
-        }
-        if (creditors.length === 0 || debtors.length === 0) {
+              // Let the logic proceed, payload will be empty/invalid and skipped later
+        } else if (creditors.length === 0 || debtors.length === 0) {
              console.warn("SettleUp Expense API: Only creditors or only debtors found. Cannot calculate weights properly for a single expense. Skipping SettleUp sync.");
-             return res.status(200).json({ message: "Game recorded to sheet, but SettleUp expense skipped (cannot represent one-sided balance)." });
+              // Let the logic proceed, payload will be empty/invalid and skipped later
         }
 
         // --- Build the Payload ---
-        const expensePayload = {
-            purpose: `Game Score Entry (ID: ${gameId})`,
-            dateTime: getCurrentTimestamp(),
-            currencyCode: "CAD", // Adjust if needed
-            type: "expense",
-            category: "🎲",
-            fixedExchangeRate: false,
-            exchangeRates: {},
-            receiptUrl: null,
+        let expensePayload = null;
+         // Only build payload if there are both creditors and debtors
+        if (creditors.length > 0 && debtors.length > 0 && totalPositive > 0) {
+             expensePayload = {
+                 purpose: `Game Score Entry (ID: ${gameId})`,
+                 dateTime: getCurrentTimestamp(),
+                 currencyCode: "CAD", // Adjust if needed
+                 type: "expense",
+                 category: "🎲",
+                 fixedExchangeRate: false,
+                 exchangeRates: {},
+                 receiptUrl: null,
 
-            // *** MODIFIED: Calculate weights with high precision ***
-            whoPaid: creditors.map(creditor => ({
-                memberId: creditor.memberId,
-                // Weight calculation using high precision (default 20)
-                weight: String(roundToPrecision(creditor.score / totalPositive))
-            })),
-            // *** END MODIFIED ***
+                 // Calculate weights with high precision
+                 whoPaid: creditors.map(creditor => ({
+                     memberId: creditor.memberId,
+                     weight: String(roundToPrecision(creditor.score / totalPositive)) // Default 20 decimals
+                 })),
 
-            items: [
-                {
-                    // Amount is the total positive value (total paid), rounded to currency precision
-                    amount: String(totalPositive),
+                 items: [
+                     {
+                         // Amount is the total positive value (total paid), rounded to currency precision
+                         amount: String(totalPositive),
 
-                    // *** MODIFIED: Calculate weights with high precision ***
-                    forWhom: debtors.map(debtor => ({
-                        memberId: debtor.memberId,
-                        // Weight calculation using high precision (default 20)
-                        weight: String(roundToPrecision(Math.abs(debtor.score) / totalPositive))
-                    }))
-                    // *** END MODIFIED ***
-                }
-            ]
-        };
-
-        // Ensure item has participants (debtors)
-        if (expensePayload.items[0].forWhom.length === 0) {
-             console.warn("SettleUp Expense API: No debtors identified for the expense item. Skipping creation.");
-             return res.status(200).json({ message: "Game recorded to sheet, SettleUp expense skipped (no debtors)." });
+                         // Calculate weights with high precision
+                         forWhom: debtors.map(debtor => ({
+                             memberId: debtor.memberId,
+                             weight: String(roundToPrecision(Math.abs(debtor.score) / totalPositive)) // Default 20 decimals
+                         }))
+                     }
+                 ]
+             };
         }
-         // Ensure there are payers (creditors)
-         if (expensePayload.whoPaid.length === 0) {
-             console.warn("SettleUp Expense API: No payers identified (creditors list empty). Skipping creation.");
-             return res.status(200).json({ message: "Game recorded to sheet, SettleUp expense skipped (no creditors)." });
-         }
 
-        // --- Step 4: Log the payload and Create the Expense ---
-        console.log("SettleUp Expense API: Payload to be sent:", JSON.stringify(expensePayload, null, 2));
 
-        console.log("SettleUp Expense API: Calling createSettleUpExpense...");
-        const creationResult = await createSettleUpExpense(groupId, token, expensePayload);
+        // --- Step 4: Create the Expense in Settle Up (Conditional) ---
+        let creationResult = null;
+        let settleUpMessage = "SettleUp sync skipped (no balanced transaction needed)."; // Default message
+
+        if (expensePayload) { // Only proceed if a valid payload was built
+            // Ensure item has participants (debtors) and payers (creditors)
+            if (expensePayload.items[0].forWhom.length === 0 || expensePayload.whoPaid.length === 0) {
+                 console.warn("SettleUp Expense API: Payload generated but missing payers or participants. Skipping creation.");
+                 settleUpMessage = "SettleUp sync skipped (missing payers or participants).";
+            } else {
+                 console.log("SettleUp Expense API: Payload to be sent:", JSON.stringify(expensePayload, null, 2));
+                 console.log("SettleUp Expense API: Calling createSettleUpExpense...");
+                 creationResult = await createSettleUpExpense(groupId, token, expensePayload);
+                 settleUpMessage = "SettleUp expense created successfully."; // Update message on success
+                 console.log("SettleUp Expense API: Expense creation successful.");
+            }
+        } else {
+            console.log("SettleUp Expense API: Skipping SettleUp expense creation as payload conditions not met (e.g., only creditors/debtors, or all zero).");
+        }
+
 
         // --- Step 5: Return Success Response ---
-        console.log("SettleUp Expense API: Expense creation successful.");
         return res.status(200).json({
-            message: "SettleUp expense created successfully.",
-            settleUpTransactionId: creationResult?.name
+            message: settleUpMessage, // Return appropriate message
+            settleUpTransactionId: creationResult?.name // Will be null if skipped
         });
 
     } catch (error) {
