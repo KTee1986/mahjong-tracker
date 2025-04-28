@@ -47,24 +47,31 @@ export default async function handler(req, res) {
 
         // Handle potential errors during fetch
         if (membersObject === null) {
-            // If members fail, we can't map names
             throw new Error(`Could not fetch members for group ${groupId}. Cannot process debts.`);
         }
         if (debtsArray === null) {
-            // If debts fail critically (not just empty)
             throw new Error(`Could not fetch debts for group ${groupId}.`);
         }
 
         console.log(`SettleUp Debts API: Fetched ${Object.keys(membersObject).length} members and ${debtsArray.length} debt records.`);
+        // Log fetched data for debugging if needed
+        // console.log("Fetched Members:", JSON.stringify(membersObject, null, 2));
+        // console.log("Fetched Debts:", JSON.stringify(debtsArray, null, 2));
+
 
         // --- Step 3: Process Debts and Map Member Names ---
         const processedDebts = debtsArray.map(debt => {
-            const fromMember = membersObject[debt.fromMemberId];
-            const toMember = membersObject[debt.toMemberId];
+            // *** MODIFIED: Use 'debt.from' and 'debt.to' for lookup ***
+            const fromMemberId = debt.from; // Use the correct key from the debt payload
+            const toMemberId = debt.to;     // Use the correct key from the debt payload
 
-            // Handle cases where member might not be found (though unlikely if data is consistent)
-            const fromName = fromMember?.name || `Unknown (${debt.fromMemberId})`;
-            const toName = toMember?.name || `Unknown (${debt.toMemberId})`;
+            const fromMember = membersObject[fromMemberId]; // Look up using the ID from debt.from
+            const toMember = membersObject[toMemberId];     // Look up using the ID from debt.to
+            // *** END MODIFIED ***
+
+            // Handle cases where member might not be found
+            const fromName = fromMember?.name || `Unknown (${fromMemberId})`;
+            const toName = toMember?.name || `Unknown (${toMemberId})`;
 
             // Validate amount
             const amount = parseFloat(debt.amount);
@@ -74,16 +81,18 @@ export default async function handler(req, res) {
             }
 
             return {
-                fromId: debt.fromMemberId,
+                fromId: fromMemberId, // Keep consistent internal key
                 fromName: fromName,
-                toId: debt.toMemberId,
+                toId: toMemberId,     // Keep consistent internal key
                 toName: toName,
-                amount: roundCurrency(amount), // Round to 2 decimal places
-                currency: debt.currencyCode || 'N/A' // Use currencyCode or fallback
+                amount: roundCurrency(amount),
+                currency: debt.currencyCode || 'N/A' // Use currencyCode if available
             };
         }).filter(debt => debt !== null); // Remove any invalid records skipped above
 
         console.log("SettleUp Debts API: Processed debts successfully.");
+        // Log processed data for debugging if needed
+        // console.log("Processed Debts:", JSON.stringify(processedDebts, null, 2));
 
         // --- Step 4: Return Processed Data ---
         return res.status(200).json({ debts: processedDebts });
