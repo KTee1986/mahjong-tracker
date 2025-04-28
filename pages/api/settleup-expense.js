@@ -7,11 +7,18 @@ import {
 
 // Helper function to get current timestamp
 const getCurrentTimestamp = () => new Date().getTime();
-// Helper function for float precision (less critical for weights but good practice)
-const roundToPrecision = (num, precision = 8) => {
+
+// *** MODIFIED: Helper function for float precision ***
+// Defaults to 20 decimal places for weights, can be overridden for currency
+const roundToPrecision = (num, precision = 20) => {
+    // Using exponential notation to handle potential precision limits with large numbers of decimals
+    if (isNaN(num) || !isFinite(num)) return 0; // Handle invalid inputs
     const factor = Math.pow(10, precision);
-    return Math.round((num + Number.EPSILON) * factor) / factor;
+    // Add a smaller epsilon to mitigate floating point issues before rounding
+    const epsilon = Number.EPSILON * Math.abs(num);
+    return Math.round((num + epsilon) * factor) / factor;
 }
+// *** END MODIFIED ***
 
 
 export default async function handler(req, res) {
@@ -71,15 +78,16 @@ export default async function handler(req, res) {
                     mappingErrors.push(`Missing SettleUp Member ID for player "${playerName}" in seat ${seat}.`);
                     continue;
                 }
-                // Use higher precision for intermediate sums
+                // Summing with potentially higher precision internally
                 const currentAggScore = aggregatedScores[memberId] || 0;
+                // Avoid direct rounding here, sum first
                 aggregatedScores[memberId] = currentAggScore + seatScore;
             }
         }
 
-        // Round final aggregated scores after summing
+        // Round final aggregated scores after summing, using standard currency precision for comparison logic
         for (const memberId in aggregatedScores) {
-             aggregatedScores[memberId] = roundToPrecision(aggregatedScores[memberId], 4); // Round to reasonable precision
+             aggregatedScores[memberId] = roundToPrecision(aggregatedScores[memberId], 4); // Round to 4 for intermediate checks
         }
 
 
@@ -87,10 +95,10 @@ export default async function handler(req, res) {
             console.error("SettleUp Expense API: Player ID mapping errors:", mappingErrors);
             return res.status(400).json({ error: `Data mapping failed: ${mappingErrors.join(' ')}` });
         }
-        console.log("SettleUp Expense API: Aggregated scores by Member ID:", aggregatedScores);
+        console.log("SettleUp Expense API: Aggregated scores by Member ID (rounded):", aggregatedScores);
 
-        // --- Step 3: Construct the SettleUp Expense Payload (Calculated Weights) ---
-        console.log("SettleUp Expense API: Constructing expense payload (Calculated Weights)...");
+        // --- Step 3: Construct the SettleUp Expense Payload (High Precision Weights) ---
+        console.log("SettleUp Expense API: Constructing expense payload (High Precision Weights)...");
 
         let totalPositive = 0;
         let totalNegative = 0;
@@ -98,7 +106,7 @@ export default async function handler(req, res) {
         const debtors = [];   // Array of { memberId: string, score: number } (score is negative)
 
         for (const memberId in aggregatedScores) {
-            const score = aggregatedScores[memberId]; // Use the already rounded score
+            const score = aggregatedScores[memberId]; // Use the 4-decimal rounded score for logic
             if (Math.abs(score) > 0.001) { // Use tolerance for zero check
                  if (score > 0) {
                      totalPositive += score;
@@ -109,11 +117,11 @@ export default async function handler(req, res) {
                  }
             }
         }
-        // Round final totals
-        totalPositive = roundToPrecision(totalPositive, 4);
-        totalNegative = roundToPrecision(totalNegative, 4);
+        // Round final totals to standard currency precision for validation and item amount
+        totalPositive = roundToPrecision(totalPositive, 2);
+        totalNegative = roundToPrecision(totalNegative, 2);
 
-        // Validation: Check if totals balance (use tolerance)
+        // Validation: Check if totals balance (use tolerance appropriate for currency)
         if (Math.abs(totalPositive + totalNegative) > 0.01) {
              console.error(`Internal calculation error: Aggregated scores do not sum to zero (${totalPositive + totalNegative}).`);
              throw new Error(`Internal calculation error: Aggregated scores do not sum to zero (${roundToPrecision(totalPositive + totalNegative, 2)}). Cannot create balanced expense.`);
@@ -124,8 +132,6 @@ export default async function handler(req, res) {
              console.log("SettleUp Expense API: All aggregated scores are zero, skipping SettleUp expense creation.");
              return res.status(200).json({ message: "Game recorded to sheet, SettleUp expense skipped (all aggregated scores zero)." });
         }
-        // If only creditors or only debtors, SettleUp usually can't represent this as a single expense.
-        // The logic relies on having both sides to calculate weights relative to the total transfer amount (totalPositive).
         if (creditors.length === 0 || debtors.length === 0) {
              console.warn("SettleUp Expense API: Only creditors or only debtors found. Cannot calculate weights properly for a single expense. Skipping SettleUp sync.");
              return res.status(200).json({ message: "Game recorded to sheet, but SettleUp expense skipped (cannot represent one-sided balance)." });
@@ -142,24 +148,24 @@ export default async function handler(req, res) {
             exchangeRates: {},
             receiptUrl: null,
 
-            // *** MODIFIED: whoPaid uses calculated weights ***
+            // *** MODIFIED: Calculate weights with high precision ***
             whoPaid: creditors.map(creditor => ({
                 memberId: creditor.memberId,
-                // Weight is proportion of their positive score to the total positive score
-                weight: String(roundToPrecision(creditor.score / totalPositive, 8)) // Use high precision for weights
+                // Weight calculation using high precision (default 20)
+                weight: String(roundToPrecision(creditor.score / totalPositive))
             })),
             // *** END MODIFIED ***
 
             items: [
                 {
-                    // Amount is the total positive value (total paid by all creditors)
-                    amount: String(roundToPrecision(totalPositive, 2)), // Amount rounded to currency precision
+                    // Amount is the total positive value (total paid), rounded to currency precision
+                    amount: String(totalPositive),
 
-                    // *** MODIFIED: forWhom uses calculated weights for debtors ***
+                    // *** MODIFIED: Calculate weights with high precision ***
                     forWhom: debtors.map(debtor => ({
                         memberId: debtor.memberId,
-                        // Weight is proportion of their debt (absolute value) to the total debt (which equals totalPositive)
-                        weight: String(roundToPrecision(Math.abs(debtor.score) / totalPositive, 8)) // Use high precision
+                        // Weight calculation using high precision (default 20)
+                        weight: String(roundToPrecision(Math.abs(debtor.score) / totalPositive))
                     }))
                     // *** END MODIFIED ***
                 }
