@@ -101,7 +101,7 @@ export default function SettleUpDebts() {
                   {debt.toName}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 text-right font-semibold">
-                  {debt.amount.toFixed(2)} {debt.currency}
+                  {debt.amount.toFixed(2)}
                 </td>
               </tr>
             ))}
