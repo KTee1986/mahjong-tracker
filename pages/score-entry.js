@@ -235,10 +235,10 @@ export default function ScoreEntry() {
       return;
     }
 
-    // 3. Check for minimum players
+    // 3. Check if ALL seats have players selected
     const seatsWithPlayersCount = seats.filter(seat => players[seat].length > 0).length;
-    if (seatsWithPlayersCount < 2) {
-        setError("At least two seats must have players selected.");
+    if (seatsWithPlayersCount < 4) { // UPDATED CHECK
+        setError("All four seats must have players selected."); // UPDATED MESSAGE
         setIsSubmitting(false);
         return;
     }
@@ -282,7 +282,7 @@ export default function ScoreEntry() {
 
         const resultText = seats
             .map(seat => `${sheetPlayersPayload[seat] || "Empty"} : ${adjustedScores[seat]}`)
-            .filter(line => !line.startsWith("Empty"))
+            // No need to filter empty as validation ensures all seats have players
             .join("\n");
         setLatestGameResult(resultText);
 
@@ -332,9 +332,9 @@ export default function ScoreEntry() {
      // Disable if sum of scores is not 0
      if (Math.abs(sumOfScores) > 0.01) return true;
 
-     // Disable if less than 2 seats have players
+     // Disable if less than 4 seats have players
      const seatsWithPlayersCount = seats.filter(seat => players[seat].length > 0).length;
-     if (seatsWithPlayersCount < 2) return true;
+     if (seatsWithPlayersCount < 4) return true; // UPDATED CHECK
 
      // Otherwise, enable
      return false;
@@ -377,6 +377,7 @@ export default function ScoreEntry() {
                         {player.name}
                       </button>
                     ))}
+                    {/* Informational messages */}
                     {availablePlayers.length === 0 && <span className="text-xs text-gray-500 italic">No players loaded</span>}
                     {availablePlayers.length > 0 && getAvailablePlayersForSeat(seat).length === 0 && players[seat].length === 0 && <span className="text-xs text-gray-500 italic">All players assigned</span>}
                     {players[seat].length === 0 && getAvailablePlayersForSeat(seat).length > 0 && <span className="text-xs text-gray-500 italic">Select player(s)</span>}
@@ -403,12 +404,12 @@ export default function ScoreEntry() {
                           <input
                               type="number"
                               min="0"
-                              value={colorCounts[seat][color]}
+                              value={colorCounts[seat][color]} // Bind directly to state value (can be '' or number)
                               onChange={(e) => handleColorInputChange(seat, color, e)}
                               className="px-1 py-1 text-center font-mono text-sm text-white bg-gray-700 border-t border-b border-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 no-spinner"
-                              style={{ width: `${INPUT_WIDTH_CH + 2}ch` }}
+                              style={{ width: `${INPUT_WIDTH_CH + 2}ch` }} // Adjust width as needed
                               disabled={isSubmitting}
-                              placeholder="0"
+                              placeholder="0" // Show placeholder if value is empty string
                           />
                           {/* Plus Button */}
                           <button
