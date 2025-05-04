@@ -154,7 +154,6 @@ export default function ScoreEntry() {
     setColorCounts(prevCounts => {
         const newCounts = { ...prevCounts };
         const currentSeatCounts = { ...newCounts[seat] };
-        // Treat empty string as 0 before changing
         const currentValue = currentSeatCounts[color] === '' ? 0 : (currentSeatCounts[color] || 0);
         const newValue = Math.max(0, currentValue + change);
         currentSeatCounts[color] = newValue;
@@ -168,12 +167,10 @@ export default function ScoreEntry() {
       const rawValue = event.target.value;
       const value = parseInt(rawValue, 10);
 
-      // Allow empty string or non-negative integers
       if (rawValue === '' || (!isNaN(value) && value >= 0)) {
           setColorCounts(prevCounts => {
               const newCounts = { ...prevCounts };
               const currentSeatCounts = { ...newCounts[seat] };
-              // Store the raw value (empty string or number)
               currentSeatCounts[color] = rawValue === '' ? '' : value;
               newCounts[seat] = currentSeatCounts;
               return newCounts;
@@ -216,9 +213,10 @@ export default function ScoreEntry() {
     setMessage("");
     setIsSubmitting(true);
 
-    // --- VALIDATION: Only check if all seats have default values ---
+    // --- VALIDATION CHECKS ---
+
+    // 1. Check if all seats have default values
     const allSeatsDefault = seats.every(seat =>
-        // Ensure comparison handles potential empty strings in input by treating them as 0
         _.isEqual(
             Object.fromEntries(Object.entries(colorCounts[seat]).map(([k, v]) => [k, v === '' ? 0 : v])),
             defaultColorCountsPerSeat
@@ -229,26 +227,39 @@ export default function ScoreEntry() {
         setIsSubmitting(false);
         return;
     }
-    // --- End Validation ---
+
+    // 2. Check if sum of scores is zero
+    if (Math.abs(sumOfScores) > 0.01) {
+      setError("Sum of scores must be exactly 0.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    // 3. Check for minimum players
+    const seatsWithPlayersCount = seats.filter(seat => players[seat].length > 0).length;
+    if (seatsWithPlayersCount < 2) {
+        setError("At least two seats must have players selected.");
+        setIsSubmitting(false);
+        return;
+    }
+
+    // --- End Validation Checks ---
 
 
     // --- Prepare data for API ---
-    // Player names string for Google Sheet
     const sheetPlayersPayload = {};
     seats.forEach(seat => {
         sheetPlayersPayload[seat] = players[seat].map(p => p.name).join(" + ");
     });
 
-    // Final scores, rounded
     const adjustedScores = {};
     seats.forEach(seat => {
         adjustedScores[seat] = parseFloat(scores[seat].toFixed(1));
     });
 
-    // Player data for Settle Up (needs {name, settleUpMemberId})
     const settleUpPlayersPayload = {};
      seats.forEach(seat => {
-        settleUpPlayersPayload[seat] = players[seat]; // Pass the array of player objects
+        settleUpPlayersPayload[seat] = players[seat];
     });
 
 
@@ -291,7 +302,7 @@ export default function ScoreEntry() {
 
         // Reset Form on Success
         setPlayers({ East: [], South: [], West: [], North: [] });
-        setColorCounts(createInitialColorCounts()); // Reset to defaults
+        setColorCounts(createInitialColorCounts());
 
       } else {
         setError(data.error || "Error submitting game to sheet.");
@@ -306,22 +317,27 @@ export default function ScoreEntry() {
 
   // Determine if Submit Button Should Be Disabled
   const isSubmitDisabled = () => {
-     if (isSubmitting) return true; // Disable during submission
+     // Disable if currently submitting
+     if (isSubmitting) return true;
 
-     // --- VALIDATION: Only disable if all seats have default values ---
+     // Disable if all seats have default values
      const allSeatsDefault = seats.every(seat =>
-        // Ensure comparison handles potential empty strings in input by treating them as 0
         _.isEqual(
             Object.fromEntries(Object.entries(colorCounts[seat]).map(([k, v]) => [k, v === '' ? 0 : v])),
             defaultColorCountsPerSeat
         )
      );
-     if (allSeatsDefault) return true; // Disable if all are default
-     // --- End Validation ---
+     if (allSeatsDefault) return true;
 
-     // REMOVED: Checks for sumOfScores, minimum players, players having non-default scores
+     // Disable if sum of scores is not 0
+     if (Math.abs(sumOfScores) > 0.01) return true;
 
-     return false; // Enable submission if not submitting and not all seats are default
+     // Disable if less than 2 seats have players
+     const seatsWithPlayersCount = seats.filter(seat => players[seat].length > 0).length;
+     if (seatsWithPlayersCount < 2) return true;
+
+     // Otherwise, enable
+     return false;
   }
 
   // Render Loading State
@@ -379,7 +395,7 @@ export default function ScoreEntry() {
                           <button
                               onClick={() => handleColorChange(seat, color, -1)}
                               className="px-3 py-1 rounded-l bg-red-700 hover:bg-red-600 text-red-100 font-bold disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 focus:ring-offset-gray-800"
-                              disabled={(colorCounts[seat][color] === '' || (colorCounts[seat][color] || 0) <= 0) || isSubmitting} // Handle empty string
+                              disabled={(colorCounts[seat][color] === '' || (colorCounts[seat][color] || 0) <= 0) || isSubmitting}
                           >
                               -
                           </button>
@@ -387,12 +403,12 @@ export default function ScoreEntry() {
                           <input
                               type="number"
                               min="0"
-                              value={colorCounts[seat][color]} // Bind directly to state value (can be '' or number)
+                              value={colorCounts[seat][color]}
                               onChange={(e) => handleColorInputChange(seat, color, e)}
                               className="px-1 py-1 text-center font-mono text-sm text-white bg-gray-700 border-t border-b border-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 no-spinner"
                               style={{ width: `${INPUT_WIDTH_CH + 2}ch` }}
                               disabled={isSubmitting}
-                              placeholder="0" // Show placeholder if value is empty string
+                              placeholder="0"
                           />
                           {/* Plus Button */}
                           <button
@@ -421,9 +437,9 @@ export default function ScoreEntry() {
       {/* Submit Section - Sticky Footer */}
       <div className="sticky bottom-0 mt-6 p-4 border-t border-gray-700 bg-gray-900 shadow-inner">
         <div className="max-w-3xl mx-auto">
-            {/* Sum of Scores Display (Still shown, but doesn't block submission) */}
-            <p className={`text-xl font-bold mb-3 text-center ${Math.abs(sumOfScores) > 0.01 ? 'text-yellow-400' : 'text-green-400'}`}>
-                Sum of Scores: {sumOfScores} {Math.abs(sumOfScores) > 0.01 ? '(Should be 0)' : ''}
+            {/* Sum of Scores Display */}
+            <p className={`text-xl font-bold mb-3 text-center ${Math.abs(sumOfScores) > 0.01 ? 'text-red-400 animate-pulse' : 'text-green-400'}`}>
+                Sum of Scores: {sumOfScores} {Math.abs(sumOfScores) > 0.01 ? '(Must be 0!)' : ''}
             </p>
             {/* Error/Message Display */}
             {error && <p className="text-red-400 text-sm break-words mb-2 text-center bg-red-900 bg-opacity-40 p-2 rounded border border-red-700">{error}</p>}
@@ -432,7 +448,7 @@ export default function ScoreEntry() {
             <button
                 onClick={handleSubmit}
                 className={`w-full bg-blue-600 hover:bg-blue-700 px-4 py-3 rounded text-white text-lg font-semibold transition-opacity duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-blue-500`}
-                disabled={isSubmitDisabled()} // Uses the simplified validation logic
+                disabled={isSubmitDisabled()} // Uses the updated validation logic
             >
                 {isSubmitting ? "Submitting..." : "Submit Game"}
             </button>
